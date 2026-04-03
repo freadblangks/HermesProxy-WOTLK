@@ -265,6 +265,9 @@ public class RealmManager
     public BattlenetRpcErrorCode JoinRealm(GlobalSessionData globalSession, uint realmAddress, uint build, IPAddress clientAddress, byte[] clientSecret, string accountName, Bgs.Protocol.GameUtilities.V1.ClientResponse response)
     {
         globalSession.RealmId = new RealmId(realmAddress);
+        Log.Print(LogType.Debug, $"JoinRealm: realmAddress=0x{realmAddress:X8}, decoded={globalSession.RealmId}, realms count={_realms.Count}");
+        foreach (var r in _realms)
+            Log.Print(LogType.Debug, $"  Available realm: {r.Key} -> {r.Value.Name}");
         Realm realm = GetRealm(globalSession.RealmId);
         if (realm != null)
         {

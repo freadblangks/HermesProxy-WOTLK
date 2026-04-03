@@ -1,16 +1,11 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+using System;
 
-namespace HermesProxy.World.Enums
+namespace HermesProxy.World.Enums;
+
+[Flags]
+public enum PetFlags : byte
 {
-    [Flags]
-    public enum PetFlags : byte
-    {
-        None           = 0x00,
-        CanBeRenamed   = 0x01,
-        CanBeAbandoned = 0x02
-    }
+	None = 0,
+	CanBeRenamed = 1,
+	CanBeAbandoned = 2
 }

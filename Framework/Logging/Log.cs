@@ -38,19 +38,25 @@ namespace Framework.Logging
             { LogType.Error,    (ConsoleColor.Red,      " Error   ") },
             { LogType.Warn,     (ConsoleColor.Yellow,   " Warning ") },
             { LogType.Storage,  (ConsoleColor.Cyan,     " Storage ") },
-        }; 
+        };
 
         static BlockingCollection<(LogType Type, string Message)> logQueue = new();
         private static Thread? _logOutputThread = null;
         public static bool IsLogging => _logOutputThread != null && !logQueue.IsCompleted;
 
         public static bool DebugLogEnabled { get; set; }
-        
+
+        private static string _logDir;
+        private static StreamWriter _logWriter;
+        private static readonly object _logWriterLock = new();
+
         /// <summary>
         /// Start the logging Thread and take logs out of the <see cref="BlockingCollection{T}"/>
         /// </summary>
         public static void Start()
         {
+            InitFileLogging();
+
             if (_logOutputThread == null)
             {
                 _logOutputThread = new Thread(() =>
@@ -66,19 +72,57 @@ namespace Framework.Logging
             }
         }
 
+        private static void InitFileLogging()
+        {
+            try
+            {
+                _logDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "logs");
+                Directory.CreateDirectory(_logDir);
+                string logFile = Path.Combine(_logDir, $"{DateTime.Now:yyyy-MM-dd_HH-mm-ss}.txt");
+                _logWriter = new StreamWriter(logFile, append: true, encoding: Encoding.UTF8) { AutoFlush = true };
+                _logWriter.WriteLine($"=== HermesProxy Log Started {DateTime.Now:yyyy-MM-dd HH:mm:ss} ===");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[Log] Failed to init file logging: {ex.Message}");
+            }
+        }
+
+        private static void WriteToFile(string line)
+        {
+            if (_logWriter == null) return;
+            try
+            {
+                lock (_logWriterLock)
+                {
+                    _logWriter.WriteLine(line);
+                }
+            }
+            catch { /* don't crash on log write failure */ }
+        }
+
         private static void PrintInternalDirectly(LogType type, string text)
         {
             if (type == LogType.Debug && !DebugLogEnabled)
                 return;
-#if DEBUG
-            Console.Write($"{DateTime.Now:HH:mm:ss.ff} | "); // This function is directly called in DEBUG, so our timesstamps can also be a more precise
-#else
-            Console.Write($"{DateTime.Now:HH:mm:ss} | ");
-#endif
-            Console.ForegroundColor = LogToColorType[type].Color;
-            Console.Write($"{LogToColorType[type].Type}");
-            Console.ResetColor();
 
+            string timestamp;
+#if DEBUG
+            timestamp = $"{DateTime.Now:HH:mm:ss.ff}";
+#else
+            timestamp = $"{DateTime.Now:HH:mm:ss}";
+#endif
+            string typeStr = LogToColorType[type].Type;
+            string fullLine = $"{timestamp} |{typeStr}| {text}";
+
+            // Write to file (always, no color codes)
+            WriteToFile(fullLine);
+
+            // Write to console (with color)
+            Console.Write($"{timestamp} | ");
+            Console.ForegroundColor = LogToColorType[type].Color;
+            Console.Write($"{typeStr}");
+            Console.ResetColor();
             Console.WriteLine($"| {text}");
         }
 

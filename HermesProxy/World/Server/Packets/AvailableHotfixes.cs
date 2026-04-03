@@ -1,0 +1,25 @@
+using System.Collections.Generic;
+using HermesProxy.World.Enums;
+using HermesProxy.World.Objects;
+
+namespace HermesProxy.World.Server.Packets;
+
+internal class AvailableHotfixes : ServerPacket
+{
+	public uint VirtualRealmAddress;
+
+	public AvailableHotfixes()
+		: base(Opcode.SMSG_AVAILABLE_HOTFIXES)
+	{
+	}
+
+	public override void Write()
+	{
+		base._worldPacket.WriteUInt32(this.VirtualRealmAddress);
+		base._worldPacket.WriteInt32(GameData.Hotfixes.Count);
+		foreach (KeyValuePair<uint, HotfixRecord> hotfix2 in GameData.Hotfixes)
+		{
+			hotfix2.Value.WriteAvailable(base._worldPacket);
+		}
+	}
+}

@@ -1,0 +1,23 @@
+namespace HermesProxy.World.Server.Packets;
+
+public class AddIgnore : ClientPacket
+{
+	private WowGuid128 AccountGuid;
+
+	public string Name;
+
+	public AddIgnore(WorldPacket packet)
+		: base(packet)
+	{
+	}
+
+	public override void Read()
+	{
+		uint nameLength = base._worldPacket.ReadBits<uint>(9);
+		if (ModernVersion.AddedInVersion(9, 1, 5, 1, 14, 1, 2, 5, 3))
+		{
+			this.AccountGuid = base._worldPacket.ReadPackedGuid128();
+		}
+		this.Name = base._worldPacket.ReadString(nameLength);
+	}
+}

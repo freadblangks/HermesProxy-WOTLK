@@ -1,26 +1,21 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+using System;
 
-namespace HermesProxy.World.Enums
+namespace HermesProxy.World.Enums;
+
+[Flags]
+public enum ObjectTypeMask
 {
-    [Flags]
-    public enum ObjectTypeMask
-    {
-        Object        = 0x01,
-        Item          = 0x02,
-        Container     = 0x04,
-        Unit          = 0x8,
-        Player        = 0x10,
-        ActivePlayer  = 0x20,
-        GameObject    = 0x40,
-        DynamicObject = 0x80,
-        Corpse        = 0x100,
-        AreaTrigger   = 0x200,
-        Sceneobject   = 0x400,
-        Conversation  = 0x800,
-        Seer = Player | Unit | DynamicObject
-    }
+	Object = 1,
+	Item = 2,
+	Container = 4,
+	Unit = 8,
+	Player = 0x10,
+	ActivePlayer = 0x20,
+	GameObject = 0x40,
+	DynamicObject = 0x80,
+	Corpse = 0x100,
+	AreaTrigger = 0x200,
+	Sceneobject = 0x400,
+	Conversation = 0x800,
+	Seer = 0x98
 }

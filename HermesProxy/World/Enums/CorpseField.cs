@@ -1,0 +1,22 @@
+namespace HermesProxy.World.Enums;
+
+public enum CorpseField
+{
+	CORPSE_END = 0,
+	[UpdateField(UpdateFieldType.Bytes)]
+	CORPSE_FIELD_BYTES_1 = 1,
+	[UpdateField(UpdateFieldType.Bytes)]
+	CORPSE_FIELD_BYTES_2 = 2,
+	CORPSE_FIELD_CUSTOM_DISPLAY_OPTION = 3,
+	CORPSE_FIELD_DISPLAY_ID = 4,
+	CORPSE_FIELD_DYNAMIC_FLAGS = 5,
+	CORPSE_FIELD_FACTIONTEMPLATE = 6,
+	CORPSE_FIELD_FLAGS = 7,
+	CORPSE_FIELD_GUILD = 8,
+	CORPSE_FIELD_GUILD_GUID = 9,
+	CORPSE_FIELD_ITEM = 10,
+	[UpdateField(UpdateFieldType.Guid)]
+	CORPSE_FIELD_OWNER = 11,
+	CORPSE_FIELD_PAD = 12,
+	CORPSE_FIELD_PARTY = 13
+}

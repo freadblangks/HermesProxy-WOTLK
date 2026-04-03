@@ -1,65 +1,72 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
+using System;
 using System.Runtime.InteropServices;
-using System.Text;
-using System.Threading.Tasks;
 
-namespace HermesProxy.World.Client
+namespace HermesProxy.World.Client;
+
+[StructLayout(LayoutKind.Explicit)]
+public struct UpdateField
 {
-    [StructLayout(LayoutKind.Explicit)]
-    public struct UpdateField
-    {
-        public UpdateField(uint val) : this()
-        {
-            UInt32Value = val;
-        }
+	[FieldOffset(0)]
+	public readonly uint UInt32Value;
 
-        public UpdateField(int val) : this()
-        {
-            Int32Value = val;
-        }
+	[FieldOffset(0)]
+	public readonly int Int32Value;
 
-        public UpdateField(float val) : this()
-        {
-            FloatValue = val;
-        }
+	[FieldOffset(0)]
+	public readonly float FloatValue;
 
-        [FieldOffset(0)] public readonly uint UInt32Value;
-        [FieldOffset(0)] public readonly int Int32Value;
-        [FieldOffset(0)] public readonly float FloatValue;
+	public UpdateField(uint val)
+	{
+		this = default(UpdateField);
+		this.UInt32Value = val;
+	}
 
-        public override bool Equals(object obj)
-        {
-            if (obj is UpdateField)
-                return Equals((UpdateField) obj);
-            return false;
-        }
+	public UpdateField(int val)
+	{
+		this = default(UpdateField);
+		this.Int32Value = val;
+	}
 
-        public bool Equals(UpdateField other)
-        {
-            if (UInt32Value == other.UInt32Value)
-                return true;
+	public UpdateField(float val)
+	{
+		this = default(UpdateField);
+		this.FloatValue = val;
+	}
 
-            if (Math.Abs(FloatValue - other.FloatValue) < float.Epsilon)
-                return true;
+	public override bool Equals(object obj)
+	{
+		if (obj is UpdateField)
+		{
+			return this.Equals((UpdateField)obj);
+		}
+		return false;
+	}
 
-            return false;
-        }
+	public bool Equals(UpdateField other)
+	{
+		if (this.UInt32Value == other.UInt32Value)
+		{
+			return true;
+		}
+		if (Math.Abs(this.FloatValue - other.FloatValue) < float.Epsilon)
+		{
+			return true;
+		}
+		return false;
+	}
 
-        public static bool operator ==(UpdateField first, UpdateField other)
-        {
-            return first.Equals(other);
-        }
+	public static bool operator ==(UpdateField first, UpdateField other)
+	{
+		return first.Equals(other);
+	}
 
-        public static bool operator !=(UpdateField first, UpdateField other)
-        {
-            return !(first == other);
-        }
+	public static bool operator !=(UpdateField first, UpdateField other)
+	{
+		return !(first == other);
+	}
 
-        public override int GetHashCode()
-        {
-            return UInt32Value.GetHashCode();
-        }
-    }
+	public override int GetHashCode()
+	{
+		return this.UInt32Value.GetHashCode();
+	}
 }

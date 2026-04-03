@@ -1,82 +1,59 @@
-﻿/*
- * Copyright (C) 2012-2020 CypherCore <http://github.com/CypherCore>
- * 
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- */
-
-using Framework.Networking;
 using System.Net.Sockets;
+using Framework;
 using Framework.Logging;
+using Framework.Networking;
 
-namespace HermesProxy.World.Server
+namespace HermesProxy.World.Server;
+
+public class WorldSocketManager : SocketManager<WorldSocket>
 {
-    public class WorldSocketManager : SocketManager<WorldSocket>
-    {
-        public override bool StartNetwork(string bindIp, int realmPort, int threadCount = 1)
-        {
-            _tcpNoDelay = true;
+	private AsyncAcceptor _instanceAcceptor;
 
-            // -1 means use default
-            _socketSendBufferSize = -1;
+	private int _socketSendBufferSize;
 
-            if (!base.StartNetwork(bindIp, realmPort, threadCount))
-                return false;
+	private bool _tcpNoDelay;
 
-            _instanceAcceptor = new AsyncAcceptor();
-            if (!_instanceAcceptor.Start(bindIp, Framework.Settings.InstancePort))
-            {
-                Log.Print(LogType.Error, "StartNetwork failed to start instance AsyncAcceptor");
-                return false;
-            }
+	public override bool StartNetwork(string bindIp, int realmPort, int threadCount = 1)
+	{
+		this._tcpNoDelay = true;
+		this._socketSendBufferSize = -1;
+		if (!base.StartNetwork(bindIp, realmPort, threadCount))
+		{
+			return false;
+		}
+		this._instanceAcceptor = new AsyncAcceptor();
+		if (!this._instanceAcceptor.Start(bindIp, Settings.InstancePort))
+		{
+			Log.Print(LogType.Error, "StartNetwork failed to start instance AsyncAcceptor", "StartNetwork", "F:\\Ampps\\HermesProxy-master\\HermesProxy\\World\\Server\\WorldSocketManager.cs");
+			return false;
+		}
+		this._instanceAcceptor.AsyncAcceptSocket(OnSocketOpen);
+		return true;
+	}
 
-            _instanceAcceptor.AsyncAcceptSocket(OnSocketOpen);
+	public override void StopNetwork()
+	{
+		this._instanceAcceptor.Close();
+		base.StopNetwork();
+		this._instanceAcceptor = null;
+	}
 
-            return true;
-        }
-
-        public override void StopNetwork()
-        {
-            _instanceAcceptor.Close();
-            base.StopNetwork();
-
-            _instanceAcceptor = null;
-        }
-
-        public override void OnSocketOpen(Socket sock)
-        {
-            Log.Print(LogType.Network, $"Instance socket open.");
-
-            // set some options here
-            try
-            {
-                if (_socketSendBufferSize >= 0)
-                    sock.SendBufferSize = _socketSendBufferSize;
-
-                // Set TCP_NODELAY.
-                sock.NoDelay = _tcpNoDelay;
-            }
-            catch (SocketException ex)
-            {
-                Log.Print(LogType.Error, ex.ToString());
-                return;
-            }
-
-            base.OnSocketOpen(sock);
-        }
-
-        AsyncAcceptor _instanceAcceptor;
-        int _socketSendBufferSize;
-        bool _tcpNoDelay;
-    }
+	public override void OnSocketOpen(Socket sock)
+	{
+		Log.Print(LogType.Network, "Instance socket open.", "OnSocketOpen", "F:\\Ampps\\HermesProxy-master\\HermesProxy\\World\\Server\\WorldSocketManager.cs");
+		try
+		{
+			if (this._socketSendBufferSize >= 0)
+			{
+				sock.SendBufferSize = this._socketSendBufferSize;
+			}
+			sock.NoDelay = this._tcpNoDelay;
+		}
+		catch (SocketException ex)
+		{
+			Log.Print(LogType.Error, ((object)ex).ToString(), "OnSocketOpen", "F:\\Ampps\\HermesProxy-master\\HermesProxy\\World\\Server\\WorldSocketManager.cs");
+			return;
+		}
+		base.OnSocketOpen(sock);
+	}
 }

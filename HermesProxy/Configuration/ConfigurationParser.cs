@@ -1,130 +1,131 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Configuration;
 using System.Globalization;
 using System.IO;
 using Framework.Logging;
 
-namespace HermesProxy.Configuration
+namespace HermesProxy.Configuration;
+
+public class ConfigurationParser
 {
-    public class ConfigurationParser
-    { 
-        private readonly KeyValueConfigurationCollection _settingsCollection;
+	private readonly KeyValueConfigurationCollection _settingsCollection;
 
-        public ConfigurationParser(KeyValueConfigurationCollection configCollection)
-        {
-            _settingsCollection = configCollection;
-        }
+	public ConfigurationParser(KeyValueConfigurationCollection configCollection)
+	{
+		this._settingsCollection = configCollection;
+	}
 
-        public static ConfigurationParser ParseFromFile(string configFile, Dictionary<string, string> overwrittenValues)
-        {
-            KeyValueConfigurationCollection settings;
-            try
-            {
-                if (!File.Exists(configFile))
-                    throw new FileNotFoundException($"File '{configFile}' was not found.");
+	public static ConfigurationParser ParseFromFile(string configFile, Dictionary<string, string> overwrittenValues)
+	{
+		KeyValueConfigurationCollection settings;
+		try
+		{
+			if (!File.Exists(configFile))
+			{
+				throw new FileNotFoundException("File '" + configFile + "' was not found.");
+			}
+			ExeConfigurationFileMap fileMap = new ExeConfigurationFileMap
+			{
+				ExeConfigFilename = configFile
+			};
+			System.Configuration.Configuration config = ConfigurationManager.OpenMappedExeConfiguration(fileMap, ConfigurationUserLevel.None);
+			settings = ((AppSettingsSection)config.Sections.Get("appSettings")).Settings;
+		}
+		catch
+		{
+			Log.Print(LogType.Error, "Fail to load config file '" + configFile + "'", "ParseFromFile", "F:\\Ampps\\HermesProxy-master\\HermesProxy\\Configuration\\ConfigurationParser.cs");
+			throw;
+		}
+		foreach (KeyValuePair<string, string> pair in overwrittenValues)
+		{
+			settings.Remove(pair.Key);
+			settings.Add(pair.Key, pair.Value);
+		}
+		return new ConfigurationParser(settings);
+	}
 
-                ExeConfigurationFileMap fileMap = new ExeConfigurationFileMap { ExeConfigFilename = configFile };
-                var config = ConfigurationManager.OpenMappedExeConfiguration(fileMap, ConfigurationUserLevel.None);
-                settings = ((AppSettingsSection)config.Sections.Get("appSettings")).Settings;
-            }
-            catch
-            {
-                Log.Print(LogType.Error, $"Fail to load config file '{configFile}'");
-                throw;
-            }
+	public string GetString(string key, string defValue)
+	{
+		return this._settingsCollection[key]?.Value ?? defValue;
+	}
 
-            // override config options with options from command line
-            foreach (var pair in overwrittenValues)
-            {
-                settings.Remove(pair.Key);
-                settings.Add(pair.Key, pair.Value);
-            }
+	public string[] GetStringList(string key, string[] defValue)
+	{
+		KeyValueConfigurationElement s = this._settingsCollection[key];
+		if (s?.Value == null)
+		{
+			return defValue;
+		}
+		string[] arr = s.Value.Split(new char[1] { ',' }, StringSplitOptions.RemoveEmptyEntries);
+		for (int i = 0; i < arr.Length; i++)
+		{
+			arr[i] = arr[i].Trim();
+		}
+		return arr;
+	}
 
-            return new ConfigurationParser(settings);
-        }
+	public bool GetBoolean(string key, bool defValue)
+	{
+		KeyValueConfigurationElement s = this._settingsCollection[key];
+		if (s?.Value == null)
+		{
+			return defValue;
+		}
+		if (bool.TryParse(s.Value, out var aux))
+		{
+			return aux;
+		}
+		Console.WriteLine("Warning: \"{0}\" is not a valid boolean value for key \"{1}\"", s.Value, key);
+		return defValue;
+	}
 
-        public string GetString(string key, string defValue)
-        {
-            KeyValueConfigurationElement s = _settingsCollection[key];
-            return s?.Value ?? defValue;
-        }
+	public int GetInt(string key, int defValue)
+	{
+		KeyValueConfigurationElement s = this._settingsCollection[key];
+		if (string.IsNullOrEmpty(s?.Value))
+		{
+			return defValue;
+		}
+		if (int.TryParse(s.Value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var aux))
+		{
+			return aux;
+		}
+		Console.WriteLine("Warning: \"{0}\" is not a valid integer value for key \"{1}\"", s.Value, key);
+		return defValue;
+	}
 
-        public string[] GetStringList(string key, string[] defValue)
-        {
-            KeyValueConfigurationElement s = _settingsCollection[key];
+	public TEnum GetEnum<TEnum>(string key, TEnum defValue) where TEnum : struct
+	{
+		KeyValueConfigurationElement s = this._settingsCollection[key];
+		if (string.IsNullOrEmpty(s?.Value))
+		{
+			return defValue;
+		}
+		if (!int.TryParse(s.Value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var value))
+		{
+			Console.WriteLine("Warning: \"{0}\" is not a valid integer value for key \"{1}\"", s.Value, key);
+			return defValue;
+		}
+		if (Enum.IsDefined(typeof(TEnum), value))
+		{
+			return (TEnum)(object)value;
+		}
+		if (Enum.TryParse<TEnum>(value.ToString(), out var enumValue))
+		{
+			return enumValue;
+		}
+		Console.WriteLine("Warning: \"{0}\" is not a valid enum value for key \"{1}\", enum \"{2}\"", s.Value, key, typeof(TEnum).Name);
+		return defValue;
+	}
 
-            if (s?.Value == null)
-                return defValue;
-
-            var arr = s.Value.Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
-
-            for (int i = 0; i < arr.Length; i++)
-                arr[i] = arr[i].Trim();
-
-            return arr;
-        }
-
-        public bool GetBoolean(string key, bool defValue)
-        {
-            KeyValueConfigurationElement s = _settingsCollection[key];
-            if (s?.Value == null)
-                return defValue;
-
-            bool aux;
-            if (bool.TryParse(s.Value, out aux))
-                return aux;
-
-            Console.WriteLine("Warning: \"{0}\" is not a valid boolean value for key \"{1}\"", s.Value, key);
-            return defValue;
-        }
-
-        public int GetInt(string key, int defValue)
-        {
-            KeyValueConfigurationElement s = _settingsCollection[key];
-            if (string.IsNullOrEmpty(s?.Value))
-                return defValue;
-
-            int aux;
-            if (int.TryParse(s.Value, NumberStyles.Integer, CultureInfo.InvariantCulture, out aux))
-                return aux;
-
-            Console.WriteLine("Warning: \"{0}\" is not a valid integer value for key \"{1}\"", s.Value, key);
-            return defValue;
-        }
-
-        public TEnum GetEnum<TEnum>(string key, TEnum defValue) where TEnum : struct
-        {
-            KeyValueConfigurationElement s = _settingsCollection[key];
-            if (string.IsNullOrEmpty(s?.Value))
-                return defValue;
-
-            int value;
-            if (!int.TryParse(s.Value, NumberStyles.Integer, CultureInfo.InvariantCulture, out value))
-            {
-                Console.WriteLine("Warning: \"{0}\" is not a valid integer value for key \"{1}\"", s.Value, key);
-                return defValue;
-            }
-
-            if (Enum.IsDefined(typeof(TEnum), value))
-                return (TEnum)(object)value;
-
-            TEnum enumValue;
-            if (Enum.TryParse(value.ToString(), out enumValue))
-                return enumValue;
-
-            Console.WriteLine("Warning: \"{0}\" is not a valid enum value for key \"{1}\", enum \"{2}\"", s.Value, key, typeof(TEnum).Name);
-            return defValue;
-        }
-
-        public byte[] GetByteArray(string key, byte[] defValue)
-        {
-            KeyValueConfigurationElement s = _settingsCollection[key];
-            if (string.IsNullOrWhiteSpace(s?.Value))
-            {
-                return defValue;
-            }
-            return s.Value.ParseAsByteArray();
-        }
-    }
+	public byte[] GetByteArray(string key, byte[] defValue)
+	{
+		KeyValueConfigurationElement s = this._settingsCollection[key];
+		if (string.IsNullOrWhiteSpace(s?.Value))
+		{
+			return defValue;
+		}
+		return s.Value.ParseAsByteArray();
+	}
 }

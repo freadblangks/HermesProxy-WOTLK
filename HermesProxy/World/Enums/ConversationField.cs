@@ -1,0 +1,9 @@
+namespace HermesProxy.World.Enums;
+
+public enum ConversationField
+{
+	CONVERSATION_FIELD_DUMMY = 0,
+	CONVERSATION_FIELD_LAST_LINE_DURATION = 1,
+	CONVERSATION_LAST_LINE_END_TIME = 2,
+	CONVERSATION_END = 3
+}

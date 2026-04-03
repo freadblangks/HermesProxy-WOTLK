@@ -1,29 +1,24 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+using System;
 
-namespace HermesProxy.World.Enums
+namespace HermesProxy.World.Enums;
+
+[Flags]
+internal enum UpdateFlag
 {
-    [Flags]
-    enum UpdateFlag
-    {
-        None              = 0x000,
-        Self              = 0x001,
-        Transport         = 0x002,
-        AttackingTarget   = 0x004,
-        LowGuid           = 0x008,
-        HighGuid          = 0x010,
-        Living            = 0x020,
-        StationaryObject  = 0x040,
-        Vehicle           = 0x080,
-        GOPosition        = 0x100,
-        GORotation        = 0x200,
-        Unknown2          = 0x400,
-        AnimKits          = 0x800,  // 4.x
-        TransportUnkArray = 0x1000, // 4.x
-        EnablePortals     = 0x2000, // 4.x
-        Unknown           = 0x4000  // 4.x
-    }
+	None = 0,
+	Self = 1,
+	Transport = 2,
+	AttackingTarget = 4,
+	LowGuid = 8,
+	HighGuid = 0x10,
+	Living = 0x20,
+	StationaryObject = 0x40,
+	Vehicle = 0x80,
+	GOPosition = 0x100,
+	GORotation = 0x200,
+	Unknown2 = 0x400,
+	AnimKits = 0x800,
+	TransportUnkArray = 0x1000,
+	EnablePortals = 0x2000,
+	Unknown = 0x4000
 }

@@ -1,343 +1,289 @@
-﻿using Framework.Collections;
+using System;
+using Framework.Collections;
 using Framework.IO;
 using Framework.Logging;
-using HermesProxy.World.Enums;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Runtime.InteropServices;
-using System.Text;
-using System.Threading.Tasks;
 
-namespace HermesProxy.World.Objects
+namespace HermesProxy.World.Objects;
+
+public class UpdateFieldsArray
 {
-    [StructLayout(LayoutKind.Explicit)]
-    public struct UpdateValues
-    {
-        [FieldOffset(0)]
-        public uint UnsignedValue;
+	public uint ValuesCount;
 
-        [FieldOffset(0)]
-        public int SignedValue;
+	public UpdateValues[] m_updateValues;
 
-        [FieldOffset(0)]
-        public float FloatValue;
-    }
+	public UpdateMask m_updateMask;
 
-    public class UpdateFieldsArray
-    {
-        public UpdateFieldsArray(uint size)
-        {
-            ValuesCount = size;
-            m_updateValues = new UpdateValues[size];
-            m_updateMask = new UpdateMask(size);
-        }
-        public uint ValuesCount;
-        public UpdateValues[] m_updateValues;
-        public UpdateMask m_updateMask;
+	public UpdateFieldsArray(uint size)
+	{
+		this.ValuesCount = size;
+		this.m_updateValues = new UpdateValues[size];
+		this.m_updateMask = new UpdateMask(size);
+	}
 
-        public void WriteToPacket(ByteBuffer buffer)
-        {
-            var fieldBuffer = new ByteBuffer();
-            for (var index = 0; index < ValuesCount; ++index)
-            {
-                if (m_updateMask.GetBit(index))
-                {
-                    fieldBuffer.WriteUInt32(m_updateValues[index].UnsignedValue);
-                }
-            }
-            m_updateMask.AppendToPacket(buffer);
-            buffer.WriteBytes(fieldBuffer);
-        }
+	public void WriteToPacket(ByteBuffer buffer)
+	{
+		ByteBuffer fieldBuffer = new ByteBuffer();
+		for (int index = 0; index < this.ValuesCount; index++)
+		{
+			if (this.m_updateMask.GetBit(index))
+			{
+				fieldBuffer.WriteUInt32(this.m_updateValues[index].UnsignedValue);
+			}
+		}
+		this.m_updateMask.AppendToPacket(buffer);
+		buffer.WriteBytes(fieldBuffer);
+	}
 
-        public void SetUpdateField<T>(object index, T value, byte offset = 0) where T : new()
-        {
-            if (value is byte byteValue)
-            {
-                if (offset > 3)
-                {
-                    Log.Print(LogType.Error, $"SetUpdateField<UInt8>: Wrong offset: {offset}");
-                    return;
-                }
+	public void SetUpdateField<T>(object index, T value, byte offset = 0) where T : new()
+	{
+		if (value is byte byteValue)
+		{
+			if (offset > 3)
+			{
+				Log.Print(LogType.Error, $"SetUpdateField<UInt8>: Wrong offset: {offset}", "SetUpdateField", "F:\\Ampps\\HermesProxy-master\\HermesProxy\\World\\Objects\\UpdateFieldsArray.cs");
+			}
+			else if ((byte)(this.m_updateValues[(int)index].UnsignedValue >> offset * 8) != byteValue)
+			{
+				this.m_updateValues[(int)index].UnsignedValue &= (uint)(~(255 << offset * 8));
+				this.m_updateValues[(int)index].UnsignedValue |= (uint)(byteValue << offset * 8);
+				this.m_updateMask.SetBit((int)index);
+			}
+		}
+		else if (value is ushort ushortValue)
+		{
+			if (offset > 1)
+			{
+				Log.Print(LogType.Error, $"SetUpdateField<UInt16>: Wrong offset: {offset}", "SetUpdateField", "F:\\Ampps\\HermesProxy-master\\HermesProxy\\World\\Objects\\UpdateFieldsArray.cs");
+			}
+			else if ((ushort)(this.GetUpdateField<uint>(index, 0) >> offset * 16) != ushortValue)
+			{
+				this.m_updateValues[(int)index].UnsignedValue &= (uint)(~(65535 << offset * 16));
+				this.m_updateValues[(int)index].UnsignedValue |= (uint)(ushortValue << offset * 16);
+				this.m_updateMask.SetBit((int)index);
+			}
+		}
+		else if (value is int intValue)
+		{
+			if (this.m_updateValues[(int)index].SignedValue != intValue)
+			{
+				this.m_updateValues[(int)index].SignedValue = intValue;
+				this.m_updateMask.SetBit((int)index);
+			}
+		}
+		else if (value is uint uintValue)
+		{
+			if (this.m_updateValues[(int)index].UnsignedValue != uintValue)
+			{
+				this.m_updateValues[(int)index].UnsignedValue = uintValue;
+				this.m_updateMask.SetBit((int)index);
+			}
+		}
+		else if (value is float floatValue)
+		{
+			if (this.m_updateValues[(int)index].FloatValue != floatValue)
+			{
+				this.m_updateValues[(int)index].FloatValue = floatValue;
+				this.m_updateMask.SetBit((int)index);
+			}
+		}
+		else if (value is ulong ulongValue)
+		{
+			if (this.GetUpdateField<ulong>(index, 0) != ulongValue)
+			{
+				this.m_updateValues[(int)index].UnsignedValue = MathFunctions.Pair64_LoPart(ulongValue);
+				this.m_updateValues[(int)index + 1].UnsignedValue = MathFunctions.Pair64_HiPart(ulongValue);
+				this.m_updateMask.SetBit((int)index);
+				this.m_updateMask.SetBit((int)index + 1);
+			}
+		}
+		else
+		{
+			if (!(value is WowGuid128 guid))
+			{
+				throw new Exception("Unhandled type " + typeof(T).ToString() + " in SetUpdateField!");
+			}
+			this.SetUpdateField(index, guid.GetLowValue(), 0);
+			this.SetUpdateField((int)index + 2, guid.GetHighValue(), 0);
+		}
+	}
 
-                if ((byte)(m_updateValues[(int)index].UnsignedValue >> (offset * 8)) != byteValue)
-                {
-                    m_updateValues[(int)index].UnsignedValue &= ~(uint)(0xFF << (offset * 8));
-                    m_updateValues[(int)index].UnsignedValue |= (uint)byteValue << (offset * 8);
-                    m_updateMask.SetBit((int)index);
-                }
-            }
-            else if (value is ushort ushortValue)
-            {
-                if (offset > 1)
-                {
-                    Log.Print(LogType.Error, $"SetUpdateField<UInt16>: Wrong offset: {offset}");
-                    return;
-                }
+	public T GetUpdateField<T>(object index, byte offset = 0)
+	{
+		T val = default(T);
+		if (1 == 0)
+		{
+		}
+		T result;
+		if (!(val is byte))
+		{
+			if (!(val is ushort))
+			{
+				if (!(val is int))
+				{
+					if (!(val is uint))
+					{
+						if (!(val is float))
+						{
+							if (!(val is ulong))
+							{
+								if (!(val is WowGuid128))
+								{
+									throw new Exception($"{typeof(T)} is not implemented in GetUpdateField<T>");
+								}
+								result = (T)Convert.ChangeType(new WowGuid128(this.GetUpdateField<ulong>((int)index + 2, 0), this.GetUpdateField<ulong>(index, 0)), typeof(T));
+							}
+							else
+							{
+								result = (T)Convert.ChangeType(((ulong)this.m_updateValues[(int)index + 1].UnsignedValue << 32) | this.m_updateValues[(int)index].UnsignedValue, typeof(T));
+							}
+						}
+						else
+						{
+							result = (T)Convert.ChangeType(this.m_updateValues[(int)index].FloatValue, typeof(T));
+						}
+					}
+					else
+					{
+						result = (T)Convert.ChangeType(this.m_updateValues[(int)index].UnsignedValue, typeof(T));
+					}
+				}
+				else
+				{
+					result = (T)Convert.ChangeType(this.m_updateValues[(int)index].SignedValue, typeof(T));
+				}
+			}
+			else
+			{
+				result = (T)Convert.ChangeType((ushort)(this.m_updateValues[(int)index].UnsignedValue >> offset * 16) & 0xFFFF, typeof(T));
+			}
+		}
+		else
+		{
+			result = (T)Convert.ChangeType((byte)(this.m_updateValues[(int)index].UnsignedValue >> offset * 8) & 0xFF, typeof(T));
+		}
+		if (1 == 0)
+		{
+		}
+		return result;
+	}
 
-                if ((ushort)(GetUpdateField<uint>(index) >> (offset * 16)) != ushortValue)
-                {
-                    m_updateValues[(int)index].UnsignedValue &= ~((uint)0xFFFF << (offset * 16));
-                    m_updateValues[(int)index].UnsignedValue |= (uint)ushortValue << (offset * 16);
-                    m_updateMask.SetBit((int)index);
-                }
-            }
-            else if (value is int intValue)
-            {
-                if (m_updateValues[(int)index].SignedValue != intValue)
-                {
-                    m_updateValues[(int)index].SignedValue = intValue;
-                    m_updateMask.SetBit((int)index);
-                }
-            }
-            else if (value is uint uintValue)
-            {
-                if (m_updateValues[(int)index].UnsignedValue != uintValue)
-                {
-                    m_updateValues[(int)index].UnsignedValue = uintValue;
-                    m_updateMask.SetBit((int)index);
-                }
-            }
-            else if (value is float floatValue)
-            {
-                if (m_updateValues[(int)index].FloatValue != floatValue)
-                {
-                    m_updateValues[(int)index].FloatValue = floatValue;
-                    m_updateMask.SetBit((int)index);
-                }
-            }
-            else if (value is ulong ulongValue)
-            {
-                if (GetUpdateField<ulong>(index) != ulongValue)
-                {
-                    m_updateValues[(int)index].UnsignedValue = MathFunctions.Pair64_LoPart(ulongValue);
-                    m_updateValues[(int)index + 1].UnsignedValue = MathFunctions.Pair64_HiPart(ulongValue);
-                    m_updateMask.SetBit((int)index);
-                    m_updateMask.SetBit((int)index + 1);
-                }
-            }
-            else if (value is WowGuid128 guid)
-            {
-                //if (GetUpdateField<WowGuid128>(index) != guid)
-                //{
-                SetUpdateField<ulong>(index, guid.GetLowValue());
-                SetUpdateField<ulong>((int)index + 2, guid.GetHighValue());
-                //}
-            }
-            else
-                throw new Exception($"Unhandled type {typeof(T).ToString()} in SetUpdateField!");
-        }
+	public void _LoadIntoDataField(string data, uint startOffset, uint count)
+	{
+		if (string.IsNullOrEmpty(data))
+		{
+			return;
+		}
+		StringArray lines = new StringArray(data, ' ');
+		if (lines.Length != count)
+		{
+			return;
+		}
+		for (int index = 0; index < count; index++)
+		{
+			if (uint.TryParse(lines[index], out var value))
+			{
+				this.m_updateValues[(int)startOffset + index].UnsignedValue = value;
+				this.m_updateMask.SetBit((int)(startOffset + index));
+			}
+		}
+	}
 
-        public T GetUpdateField<T>(object index, byte offset = 0) =>
-            default(T) switch
-            {
-                byte => (T)Convert.ChangeType((byte)(m_updateValues[(int)index].UnsignedValue >> (offset * 8)) & 0xFF, typeof(T)),
-                ushort => (T)Convert.ChangeType((ushort)(m_updateValues[(int)index].UnsignedValue >> (offset * 16)) & 0xFFFF, typeof(T)),
-                int => (T)Convert.ChangeType(m_updateValues[(int)index].SignedValue, typeof(T)),
-                uint => (T)Convert.ChangeType(m_updateValues[(int)index].UnsignedValue, typeof(T)),
-                float => (T)Convert.ChangeType(m_updateValues[(int)index].FloatValue, typeof(T)),
-                ulong => (T)Convert.ChangeType((ulong)m_updateValues[(int)index + 1].UnsignedValue << 32 | m_updateValues[(int)index].UnsignedValue, typeof(T)),
-                WowGuid128 => (T)Convert.ChangeType(new WowGuid128(GetUpdateField<ulong>((int)index + 2), GetUpdateField<ulong>(index)), typeof(T)),
-                _ => throw new Exception($"{typeof(T)} is not implemented in GetUpdateField<T>"),
-            };
+	public bool HasFlag(object index, object flag)
+	{
+		if ((int)index >= this.ValuesCount)
+		{
+			return false;
+		}
+		return (this.GetUpdateField<uint>(index, 0) & (uint)flag) != 0;
+	}
 
+	public void AddFlag(object index, object newFlag)
+	{
+		uint oldValue = this.m_updateValues[(int)index].UnsignedValue;
+		uint newValue = oldValue | Convert.ToUInt32(newFlag);
+		if (oldValue != newValue)
+		{
+			this.SetUpdateField(index, newValue, 0);
+		}
+	}
 
-        public void _LoadIntoDataField(string data, uint startOffset, uint count)
-        {
-            if (string.IsNullOrEmpty(data))
-                return;
+	public void RemoveFlag(object index, object newFlag)
+	{
+		uint oldValue = this.m_updateValues[(int)index].UnsignedValue;
+		uint newValue = oldValue & ~Convert.ToUInt32(newFlag);
+		if (oldValue != newValue)
+		{
+			this.SetUpdateField(index, newValue, 0);
+		}
+	}
 
-            var lines = new StringArray(data, ' ');
-            if (lines.Length != count)
-                return;
+	public void ApplyFlag<T>(object index, T flag, bool apply)
+	{
+		if (apply)
+		{
+			this.AddFlag(index, flag);
+		}
+		else
+		{
+			this.RemoveFlag(index, flag);
+		}
+	}
 
-            for (var index = 0; index < count; ++index)
-            {
-                if (uint.TryParse(lines[index], out uint value))
-                {
-                    m_updateValues[(int)startOffset + index].UnsignedValue = value;
-                    m_updateMask.SetBit((int)(startOffset + index));
-                }
-            }
-        }
-        public bool HasFlag(object index, object flag)
-        {
-            if ((int)index >= ValuesCount)
-                return false;
+	public void AddFlag64(object index, object newFlag)
+	{
+		ulong oldValue = this.GetUpdateField<ulong>(index, 0);
+		ulong newValue = oldValue | Convert.ToUInt64(newFlag);
+		if (oldValue != newValue)
+		{
+			this.SetUpdateField(index, newValue, 0);
+		}
+	}
 
-            return (GetUpdateField<uint>(index) & (uint)flag) != 0;
-        }
+	public void RemoveFlag64(object index, object newFlag)
+	{
+		ulong oldValue = this.GetUpdateField<ulong>(index, 0);
+		ulong newValue = oldValue & ~Convert.ToUInt64(newFlag);
+		if (oldValue != newValue)
+		{
+			this.SetUpdateField(index, newValue, 0);
+		}
+	}
 
-        public void AddFlag(object index, object newFlag)
-        {
-            var oldValue = m_updateValues[(int)index].UnsignedValue;
-            var newValue = oldValue | Convert.ToUInt32(newFlag);
+	public void ApplyFlag64<T>(object index, T flag, bool apply)
+	{
+		if (apply)
+		{
+			this.AddFlag(index, flag);
+		}
+		else
+		{
+			this.RemoveFlag(index, flag);
+		}
+	}
 
-            if (oldValue != newValue)
-                SetUpdateField<uint>(index, newValue);
-        }
+	public void AddByteFlag(object index, byte offset, object newFlag)
+	{
+		if (offset > 4)
+		{
+			Log.Print(LogType.Error, $"Object.SetByteFlag: Wrong offset {offset}", "AddByteFlag", "F:\\Ampps\\HermesProxy-master\\HermesProxy\\World\\Objects\\UpdateFieldsArray.cs");
+		}
+		else if ((((byte)this.m_updateValues[(int)index].UnsignedValue >> offset * 8) & (int)newFlag) == 0)
+		{
+			this.m_updateValues[(int)index].UnsignedValue |= (uint)newFlag << offset * 8;
+			this.m_updateMask.SetBit((int)index);
+		}
+	}
 
-        public void RemoveFlag(object index, object newFlag)
-        {
-            var oldValue = m_updateValues[(int)index].UnsignedValue;
-            var newValue = oldValue & ~Convert.ToUInt32(newFlag);
-
-            if (oldValue != newValue)
-            {
-                SetUpdateField<uint>(index, newValue);
-            }
-        }
-
-        public void ApplyFlag<T>(object index, T flag, bool apply)
-        {
-            if (apply)
-                AddFlag(index, flag);
-            else
-                RemoveFlag(index, flag);
-        }
-
-        public void AddFlag64(object index, object newFlag)
-        {
-            var oldValue = GetUpdateField<ulong>(index);
-            var newValue = oldValue | Convert.ToUInt64(newFlag);
-
-            if (oldValue != newValue)
-                SetUpdateField<ulong>(index, newValue);
-        }
-
-        public void RemoveFlag64(object index, object newFlag)
-        {
-            var oldValue = GetUpdateField<ulong>(index);
-            var newValue = oldValue & ~Convert.ToUInt64(newFlag);
-
-            if (oldValue != newValue)
-                SetUpdateField<ulong>(index, newValue);
-        }
-
-        public void ApplyFlag64<T>(object index, T flag, bool apply)
-        {
-            if (apply)
-                AddFlag(index, flag);
-            else
-                RemoveFlag(index, flag);
-        }
-
-        public void AddByteFlag(object index, byte offset, object newFlag)
-        {
-            if (offset > 4)
-            {
-                Log.Print(LogType.Error,  $"Object.SetByteFlag: Wrong offset {offset}");
-                return;
-            }
-
-            if (((byte)m_updateValues[(int)index].UnsignedValue >> (offset * 8) & (int)newFlag) == 0)
-            {
-                m_updateValues[(int)index].UnsignedValue |= (uint)newFlag << (offset * 8);
-                m_updateMask.SetBit((int)index);
-            }
-        }
-
-        public void RemoveByteFlag(object index, byte offset, object oldFlag)
-        {
-            if (offset > 4)
-            {
-                Log.Print(LogType.Error,  $"Object.RemoveByteFlag: Wrong offset {offset}");
-                return;
-            }
-
-            if (((byte)m_updateValues[(int)index].UnsignedValue >> (offset * 8) & (int)oldFlag) != 0)
-            {
-                m_updateValues[(int)index].UnsignedValue &= ~((uint)oldFlag << (offset * 8));
-                m_updateMask.SetBit((int)index);
-            }
-        }
-    }
-
-    public class DynamicUpdateFieldsArray
-    {
-        public DynamicUpdateFieldsArray(uint size, UpdateTypeModern updateType)
-        {
-            ValuesCount = size;
-            m_updateType = updateType;
-            m_updateMask = new UpdateMask(size);
-            m_fieldBuffer = new();
-        }
-        uint ValuesCount;
-        UpdateTypeModern m_updateType;
-        UpdateMask m_updateMask;
-        ByteBuffer m_fieldBuffer;
-
-        public void WriteToPacket(ByteBuffer buffer)
-        {
-            m_updateMask.AppendToPacket(buffer);
-            buffer.WriteBytes(m_fieldBuffer);
-        }
-
-        public void SetUpdateField(int index, uint[] values, DynamicFieldChangeType changeType)
-        {
-            var valueBuffer = new ByteBuffer();
-            m_updateMask.SetBit(index);
-
-            var arrayMask = new DynamicUpdateMask((uint)values.Length);
-            arrayMask.EncodeDynamicFieldChangeType(changeType, m_updateType);
-            if (m_updateType == UpdateTypeModern.Values && changeType == DynamicFieldChangeType.ValueAndSizeChanged)
-            {
-                arrayMask.ValueCount = values.Length;
-                arrayMask.SetCount(values.Length);
-            } 
-
-            for (var v = 0; v < values.Length; ++v)
-            {
-                arrayMask.SetBit(v);
-                valueBuffer.WriteUInt32(values[v]);
-            }
-
-            arrayMask.AppendToPacket(m_fieldBuffer);
-            m_fieldBuffer.WriteBytes(valueBuffer);
-        }
-
-        public void SetUpdateField<T>(object index, T value, DynamicFieldChangeType changeType) where T : new()
-        {
-            if (value is int intValue)
-            {
-                uint[] values = new uint[1];
-                UpdateValues union = new();
-                union.SignedValue = intValue;
-                values[0] = union.UnsignedValue;
-                SetUpdateField((int)index, values, changeType);
-            }
-            else if (value is uint uintValue)
-            {
-                uint[] values = new uint[1];
-                values[0] = uintValue;
-                SetUpdateField((int)index, values, changeType);
-            }
-            else if (value is float floatValue)
-            {
-                uint[] values = new uint[1];
-                UpdateValues union = new();
-                union.FloatValue = floatValue;
-                values[0] = union.UnsignedValue;
-                SetUpdateField((int)index, values, changeType);
-            }
-            else if (value is ulong ulongValue)
-            {
-                uint[] values = new uint[2];
-                values[0] = MathFunctions.Pair64_LoPart(ulongValue);
-                values[1] = MathFunctions.Pair64_HiPart(ulongValue);
-                SetUpdateField((int)index, values, changeType);
-            }
-            else if (value is WowGuid128 guid)
-            {
-                uint[] values = new uint[4];
-                values[0] = MathFunctions.Pair64_LoPart(guid.GetLowValue());
-                values[1] = MathFunctions.Pair64_HiPart(guid.GetLowValue());
-                values[2] = MathFunctions.Pair64_LoPart(guid.GetHighValue());
-                values[3] = MathFunctions.Pair64_HiPart(guid.GetHighValue());
-                SetUpdateField((int)index, values, changeType);
-            }
-            else
-                throw new Exception($"Unhandled type {typeof(T).ToString()} in SetUpdateField!");
-        }
-    }
+	public void RemoveByteFlag(object index, byte offset, object oldFlag)
+	{
+		if (offset > 4)
+		{
+			Log.Print(LogType.Error, $"Object.RemoveByteFlag: Wrong offset {offset}", "RemoveByteFlag", "F:\\Ampps\\HermesProxy-master\\HermesProxy\\World\\Objects\\UpdateFieldsArray.cs");
+		}
+		else if ((((byte)this.m_updateValues[(int)index].UnsignedValue >> offset * 8) & (int)oldFlag) != 0)
+		{
+			this.m_updateValues[(int)index].UnsignedValue &= ~((uint)oldFlag << offset * 8);
+			this.m_updateMask.SetBit((int)index);
+		}
+	}
 }

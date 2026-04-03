@@ -67,9 +67,11 @@ namespace Framework.Networking
 
             try
             {
+                Log.Print(LogType.Debug, $"SSLSocket waiting for data from {GetRemoteIpEndPoint()}...");
                 var result = await _stream.ReadAsync(_receiveBuffer, 0, _receiveBuffer.Length);
                 if (result == 0)
                 {
+                    Log.Print(LogType.Debug, $"SSLSocket: client {GetRemoteIpEndPoint()} sent 0 bytes (connection closed)");
                     CloseSocket();
                     return;
                 }
@@ -78,7 +80,7 @@ namespace Framework.Networking
             }
             catch (Exception ex)
             {
-                Log.outException(ex);
+                Log.Print(LogType.Error, $"SSLSocket: read error from {GetRemoteIpEndPoint()}: {ex.GetType().Name}: {ex.Message}");
             }
         }
 
@@ -86,11 +88,20 @@ namespace Framework.Networking
         {
             try
             {
-                await _stream.AuthenticateAsServerAsync(certificate, false, SslProtocols.Tls12, false);
+                Log.Print(LogType.Debug, $"TLS handshake starting with {GetRemoteIpEndPoint()}");
+                using var cts = new System.Threading.CancellationTokenSource(TimeSpan.FromSeconds(5));
+                await _stream.AuthenticateAsServerAsync(new System.Net.Security.SslServerAuthenticationOptions
+                {
+                    ServerCertificate = certificate,
+                    EnabledSslProtocols = SslProtocols.Tls12 | SslProtocols.None,
+                    ClientCertificateRequired = false,
+                    CertificateRevocationCheckMode = System.Security.Cryptography.X509Certificates.X509RevocationMode.NoCheck,
+                }, cts.Token);
+                Log.Print(LogType.Debug, $"TLS handshake succeeded with {GetRemoteIpEndPoint()}");
             }
             catch(Exception ex)
             {
-                Log.outException(ex);
+                Log.Print(LogType.Error, $"TLS handshake FAILED with {GetRemoteIpEndPoint()}: {ex.GetType().Name}: {ex.Message}");
                 CloseSocket();
                 return;
             }

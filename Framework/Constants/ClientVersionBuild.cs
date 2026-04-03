@@ -525,7 +525,7 @@ namespace HermesProxy.Enums
         V2_5_3_42598 = 42598, // live
 
         // WotLK Classic
-        V3_4_3_54621 = 54621, // WotLK Classic 3.4.3
+        V3_4_3_54261 = 54261, // WotLK Classic 3.4.3
 
         // Battle.net - should probably not mix this but oh well
         BattleNetV37165 = 37165,

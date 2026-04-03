@@ -1,0 +1,15 @@
+namespace HermesProxy.World.Enums;
+
+public enum DynamicObjectField
+{
+	[UpdateField(UpdateFieldType.Bytes)]
+	DYNAMICOBJECT_BYTES = 0,
+	[UpdateField(UpdateFieldType.Guid)]
+	DYNAMICOBJECT_CASTER = 1,
+	DYNAMICOBJECT_CASTTIME = 2,
+	DYNAMICOBJECT_END = 3,
+	DYNAMICOBJECT_RADIUS = 4,
+	DYNAMICOBJECT_SPELLID = 5,
+	DYNAMICOBJECT_SPELL_X_SPELL_VISUAL_ID = 6,
+	DYNAMICOBJECT_TYPE = 7
+}

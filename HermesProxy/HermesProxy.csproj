@@ -25,6 +25,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="BouncyCastle.Cryptography" Version="2.6.2" />
     <PackageReference Include="DotNetZip" Version="1.15.0" />
 
     <PackageReference Include="GitVersion.MsBuild" Version="5.10.3">

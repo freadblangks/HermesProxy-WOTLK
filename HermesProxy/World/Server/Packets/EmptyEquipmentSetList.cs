@@ -1,0 +1,17 @@
+using Framework.Constants;
+using HermesProxy.World.Enums;
+
+namespace HermesProxy.World.Server.Packets;
+
+public class EmptyEquipmentSetList : ServerPacket
+{
+	public EmptyEquipmentSetList()
+		: base(Opcode.SMSG_LOAD_EQUIPMENT_SET, ConnectionType.Instance)
+	{
+	}
+
+	public override void Write()
+	{
+		base._worldPacket.WriteUInt32(0u);
+	}
+}
