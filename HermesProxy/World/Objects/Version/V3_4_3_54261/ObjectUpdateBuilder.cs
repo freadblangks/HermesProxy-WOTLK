@@ -473,6 +473,36 @@ public class ObjectUpdateBuilder
 		if (u.MaxPower != null)
 			for (int i = 0; i < u.MaxPower.Length; i++)
 				if (u.MaxPower[i].HasValue) return true;
+		// Block 1 continued + Block 2 combat stats
+		if (u.MinDamage.HasValue || u.MaxDamage.HasValue || u.MinOffHandDamage.HasValue || u.MaxOffHandDamage.HasValue) return true;
+		if (u.StandState.HasValue || u.VisFlags.HasValue || u.AnimTier.HasValue) return true;
+		if (u.ModCastSpeed.HasValue || u.ModCastHaste.HasValue || u.EmoteState.HasValue) return true;
+		if (u.SheatheState.HasValue || u.ShapeshiftForm.HasValue) return true;
+		if (u.AttackPower.HasValue || u.AttackPowerModPos.HasValue || u.AttackPowerModNeg.HasValue) return true;
+		if (u.RangedAttackPower.HasValue || u.BaseMana.HasValue || u.BaseHealth.HasValue) return true;
+		// Block 5: Stats
+		if (u.Stats != null)
+			for (int i = 0; i < u.Stats.Length; i++)
+				if (u.Stats[i].HasValue) return true;
+		if (u.StatPosBuff != null)
+			for (int i = 0; i < u.StatPosBuff.Length; i++)
+				if (u.StatPosBuff[i].HasValue) return true;
+		if (u.StatNegBuff != null)
+			for (int i = 0; i < u.StatNegBuff.Length; i++)
+				if (u.StatNegBuff[i].HasValue) return true;
+		// Blocks 5-6: Resistances
+		if (u.Resistances != null)
+			for (int i = 0; i < 7; i++)
+				if (u.Resistances[i].HasValue) return true;
+		if (u.ResistanceBuffModsPositive != null)
+			for (int i = 0; i < 7; i++)
+				if (u.ResistanceBuffModsPositive[i].HasValue) return true;
+		if (u.ResistanceBuffModsNegative != null)
+			for (int i = 0; i < 7; i++)
+				if (u.ResistanceBuffModsNegative[i].HasValue) return true;
+		if (u.AttackRoundBaseTime != null)
+			for (int i = 0; i < u.AttackRoundBaseTime.Length; i++)
+				if (u.AttackRoundBaseTime[i].HasValue) return true;
 		return false;
 	}
 
@@ -1131,10 +1161,64 @@ public class ObjectUpdateBuilder
 		{
 			SetBit(51);
 		}
+		// Block 1 continued: damage, stance bytes, pet fields
+		if (unit.MinDamage.HasValue) SetBit(52);
+		if (unit.MaxDamage.HasValue) SetBit(53);
+		if (unit.MinOffHandDamage.HasValue) SetBit(54);
+		if (unit.MaxOffHandDamage.HasValue) SetBit(55);
+		if (unit.StandState.HasValue) SetBit(56);
+		// 57 = PetTalentPoints (not tracked)
+		if (unit.VisFlags.HasValue) SetBit(58);
+		if (unit.AnimTier.HasValue) SetBit(59);
+		if (unit.PetNumber.HasValue) SetBit(60);
+		if (unit.PetNameTimestamp.HasValue) SetBit(61);
+		if (unit.PetExperience.HasValue) SetBit(62);
+		if (unit.PetNextLevelExperience.HasValue) SetBit(63);
+		// Block 2: ModCast/Haste, combat stats, attack power
+		if (unit.ModCastSpeed.HasValue) SetBit(65);
+		if (unit.ModCastHaste.HasValue) SetBit(66);
+		if (unit.ModHaste.HasValue) SetBit(67);
+		if (unit.ModRangedHaste.HasValue) SetBit(68);
+		if (unit.ModHasteRegen.HasValue) SetBit(69);
+		if (unit.ModTimeRate.HasValue) SetBit(70);
+		if (unit.CreatedBySpell.HasValue) SetBit(71);
+		if (unit.EmoteState.HasValue) SetBit(72);
+		// 73-74 = TrainingPointsUsed/Total (not tracked individually)
+		if (unit.BaseMana.HasValue) SetBit(75);
+		if (unit.BaseHealth.HasValue) SetBit(76);
+		if (unit.SheatheState.HasValue) SetBit(77);
+		if (unit.PvpFlags.HasValue) SetBit(78);
+		if (unit.PetFlags.HasValue) SetBit(79);
+		if (unit.ShapeshiftForm.HasValue) SetBit(80);
+		if (unit.AttackPower.HasValue) SetBit(81);
+		if (unit.AttackPowerModPos.HasValue) SetBit(82);
+		if (unit.AttackPowerModNeg.HasValue) SetBit(83);
+		if (unit.AttackPowerMultiplier.HasValue) SetBit(84);
+		if (unit.RangedAttackPower.HasValue) SetBit(85);
+		if (unit.RangedAttackPowerModPos.HasValue) SetBit(86);
+		if (unit.RangedAttackPowerModNeg.HasValue) SetBit(87);
+		if (unit.RangedAttackPowerMultiplier.HasValue) SetBit(88);
+		if (unit.AttackSpeedAura.HasValue) SetBit(89);
+		if (unit.Lifesteal.HasValue) SetBit(90);
+		if (unit.MinRangedDamage.HasValue) SetBit(91);
+		if (unit.MaxRangedDamage.HasValue) SetBit(92);
+		if (unit.MaxHealthModifier.HasValue) SetBit(93);
 		if (unit.HoverHeight.HasValue)
 		{
 			SetBit(94);
 		}
+		if (unit.MinItemLevelCutoff.HasValue) SetBit(95);
+		// Block 3: MinItemLevel..GuildGUID
+		if (unit.MinItemLevel.HasValue) SetBit(97);
+		if (unit.MaxItemLevel.HasValue) SetBit(98);
+		if (unit.WildBattlePetLevel.HasValue) SetBit(99);
+		// 100 = BattlePetCompanionNameTimestamp (not tracked)
+		if (unit.InteractSpellID.HasValue) SetBit(101);
+		if (unit.ScaleDuration.HasValue) SetBit(102);
+		if (unit.LooksLikeMountID.HasValue) SetBit(103);
+		if (unit.LooksLikeCreatureID.HasValue) SetBit(104);
+		if (unit.LookAtControllerID.HasValue) SetBit(105);
+		// 106 = PerksVendorItemID (not tracked)
 		if (unit.GuildGUID != null)
 		{
 			SetBit(107);
@@ -1178,6 +1262,85 @@ public class ObjectUpdateBuilder
 		}
 		if (hasAnyPowerGroup)
 			SetBit(116); // parent bit for Power/MaxPower/Regen arrays
+		// AttackRoundBaseTime array (parent bit 171, elements 172-173)
+		if (unit.AttackRoundBaseTime != null)
+		{
+			bool hasAnyART = false;
+			for (int i = 0; i < unit.AttackRoundBaseTime.Length && i < 2; i++)
+			{
+				if (unit.AttackRoundBaseTime[i].HasValue)
+				{
+					SetBit(172 + i);
+					hasAnyART = true;
+				}
+			}
+			if (hasAnyART) SetBit(171);
+		}
+		// Stats/StatPosBuff/StatNegBuff array (parent bit 174, elements 175-189)
+		bool hasAnyStatsGroup = false;
+		if (unit.Stats != null)
+		{
+			for (int i = 0; i < 5; i++)
+			{
+				if (unit.Stats[i].HasValue) { SetBit(175 + i); hasAnyStatsGroup = true; }
+			}
+		}
+		if (unit.StatPosBuff != null)
+		{
+			for (int i = 0; i < 5; i++)
+			{
+				if (unit.StatPosBuff[i].HasValue) { SetBit(180 + i); hasAnyStatsGroup = true; }
+			}
+		}
+		if (unit.StatNegBuff != null)
+		{
+			for (int i = 0; i < 5; i++)
+			{
+				if (unit.StatNegBuff[i].HasValue) { SetBit(185 + i); hasAnyStatsGroup = true; }
+			}
+		}
+		if (hasAnyStatsGroup) SetBit(174);
+		// Resistances/PowerCostModifier/PowerCostMultiplier array (parent bit 190, elements 191-211)
+		bool hasAnyResistGroup = false;
+		if (unit.Resistances != null)
+		{
+			for (int i = 0; i < 7; i++)
+			{
+				if (unit.Resistances[i].HasValue) { SetBit(191 + i); hasAnyResistGroup = true; }
+			}
+		}
+		if (unit.PowerCostModifier != null)
+		{
+			for (int i = 0; i < 7; i++)
+			{
+				if (unit.PowerCostModifier[i].HasValue) { SetBit(198 + i); hasAnyResistGroup = true; }
+			}
+		}
+		if (unit.PowerCostMultiplier != null)
+		{
+			for (int i = 0; i < 7; i++)
+			{
+				if (unit.PowerCostMultiplier[i].HasValue) { SetBit(205 + i); hasAnyResistGroup = true; }
+			}
+		}
+		if (hasAnyResistGroup) SetBit(190);
+		// ResistanceBuffMods array (parent bit 212, elements 213-226)
+		bool hasAnyResBuffGroup = false;
+		if (unit.ResistanceBuffModsPositive != null)
+		{
+			for (int i = 0; i < 7; i++)
+			{
+				if (unit.ResistanceBuffModsPositive[i].HasValue) { SetBit(213 + i); hasAnyResBuffGroup = true; }
+			}
+		}
+		if (unit.ResistanceBuffModsNegative != null)
+		{
+			for (int i = 0; i < 7; i++)
+			{
+				if (unit.ResistanceBuffModsNegative[i].HasValue) { SetBit(220 + i); hasAnyResBuffGroup = true; }
+			}
+		}
+		if (hasAnyResBuffGroup) SetBit(212);
 		for (int bi = 0; bi < 8; bi++)
 		{
 			if (blockMasks[bi] != 0)
@@ -1306,13 +1469,66 @@ public class ObjectUpdateBuilder
 			{
 				data.WriteInt32(unit.MountDisplayID.Value);
 			}
+			// Block 1 continued: damage, stance, pet
+			if (unit.MinDamage.HasValue) data.WriteFloat(unit.MinDamage.Value);
+			if (unit.MaxDamage.HasValue) data.WriteFloat(unit.MaxDamage.Value);
+			if (unit.MinOffHandDamage.HasValue) data.WriteFloat(unit.MinOffHandDamage.Value);
+			if (unit.MaxOffHandDamage.HasValue) data.WriteFloat(unit.MaxOffHandDamage.Value);
+			if (unit.StandState.HasValue) data.WriteUInt8(unit.StandState.Value);
+			if (unit.VisFlags.HasValue) data.WriteUInt8(unit.VisFlags.Value);
+			if (unit.AnimTier.HasValue) data.WriteUInt8(unit.AnimTier.Value);
+			if (unit.PetNumber.HasValue) data.WriteUInt32(unit.PetNumber.Value);
+			if (unit.PetNameTimestamp.HasValue) data.WriteUInt32(unit.PetNameTimestamp.Value);
+			if (unit.PetExperience.HasValue) data.WriteUInt32(unit.PetExperience.Value);
+			if (unit.PetNextLevelExperience.HasValue) data.WriteUInt32(unit.PetNextLevelExperience.Value);
 		}
-		if ((blocksMask & 4) != 0 && unit.HoverHeight.HasValue)
+		// Block 2 (bits 64-95): ModCast/Haste, combat stats, attack power
+		if ((blocksMask & 4) != 0)
 		{
-			data.WriteFloat(unit.HoverHeight.Value);
+			if (unit.ModCastSpeed.HasValue) data.WriteFloat(unit.ModCastSpeed.Value);
+			if (unit.ModCastHaste.HasValue) data.WriteFloat(unit.ModCastHaste.Value);
+			if (unit.ModHaste.HasValue) data.WriteFloat(unit.ModHaste.Value);
+			if (unit.ModRangedHaste.HasValue) data.WriteFloat(unit.ModRangedHaste.Value);
+			if (unit.ModHasteRegen.HasValue) data.WriteFloat(unit.ModHasteRegen.Value);
+			if (unit.ModTimeRate.HasValue) data.WriteFloat(unit.ModTimeRate.Value);
+			if (unit.CreatedBySpell.HasValue) data.WriteInt32(unit.CreatedBySpell.Value);
+			if (unit.EmoteState.HasValue) data.WriteInt32(unit.EmoteState.Value);
+			// 73-74: TrainingPointsUsed/Total not tracked
+			if (unit.BaseMana.HasValue) data.WriteInt32(unit.BaseMana.Value);
+			if (unit.BaseHealth.HasValue) data.WriteInt32(unit.BaseHealth.Value);
+			if (unit.SheatheState.HasValue) data.WriteUInt8(unit.SheatheState.Value);
+			if (unit.PvpFlags.HasValue) data.WriteUInt8(unit.PvpFlags.Value);
+			if (unit.PetFlags.HasValue) data.WriteUInt8(unit.PetFlags.Value);
+			if (unit.ShapeshiftForm.HasValue) data.WriteUInt8(unit.ShapeshiftForm.Value);
+			if (unit.AttackPower.HasValue) data.WriteInt32(unit.AttackPower.Value);
+			if (unit.AttackPowerModPos.HasValue) data.WriteInt32(unit.AttackPowerModPos.Value);
+			if (unit.AttackPowerModNeg.HasValue) data.WriteInt32(unit.AttackPowerModNeg.Value);
+			if (unit.AttackPowerMultiplier.HasValue) data.WriteFloat(unit.AttackPowerMultiplier.Value);
+			if (unit.RangedAttackPower.HasValue) data.WriteInt32(unit.RangedAttackPower.Value);
+			if (unit.RangedAttackPowerModPos.HasValue) data.WriteInt32(unit.RangedAttackPowerModPos.Value);
+			if (unit.RangedAttackPowerModNeg.HasValue) data.WriteInt32(unit.RangedAttackPowerModNeg.Value);
+			if (unit.RangedAttackPowerMultiplier.HasValue) data.WriteFloat(unit.RangedAttackPowerMultiplier.Value);
+			if (unit.AttackSpeedAura.HasValue) data.WriteInt32(unit.AttackSpeedAura.Value);
+			if (unit.Lifesteal.HasValue) data.WriteFloat(unit.Lifesteal.Value);
+			if (unit.MinRangedDamage.HasValue) data.WriteFloat(unit.MinRangedDamage.Value);
+			if (unit.MaxRangedDamage.HasValue) data.WriteFloat(unit.MaxRangedDamage.Value);
+			if (unit.MaxHealthModifier.HasValue) data.WriteFloat(unit.MaxHealthModifier.Value);
+			if (unit.HoverHeight.HasValue) data.WriteFloat(unit.HoverHeight.Value);
+			if (unit.MinItemLevelCutoff.HasValue) data.WriteInt32(unit.MinItemLevelCutoff.Value);
 		}
+		// Block 3 (bits 96-127): MinItemLevel..ComboTarget, GuildGUID, NpcFlags
 		if ((blocksMask & 8) != 0)
 		{
+			if (unit.MinItemLevel.HasValue) data.WriteInt32(unit.MinItemLevel.Value);
+			if (unit.MaxItemLevel.HasValue) data.WriteInt32(unit.MaxItemLevel.Value);
+			if (unit.WildBattlePetLevel.HasValue) data.WriteInt32(unit.WildBattlePetLevel.Value);
+			// 100 = BattlePetCompanionNameTimestamp not tracked
+			if (unit.InteractSpellID.HasValue) data.WriteInt32(unit.InteractSpellID.Value);
+			if (unit.ScaleDuration.HasValue) data.WriteInt32(unit.ScaleDuration.Value);
+			if (unit.LooksLikeMountID.HasValue) data.WriteInt32(unit.LooksLikeMountID.Value);
+			if (unit.LooksLikeCreatureID.HasValue) data.WriteInt32(unit.LooksLikeCreatureID.Value);
+			if (unit.LookAtControllerID.HasValue) data.WriteInt32(unit.LookAtControllerID.Value);
+			// 106 = PerksVendorItemID not tracked
 			if (unit.GuildGUID != null)
 			{
 				data.WritePackedGuid128(unit.GuildGUID);
@@ -1348,6 +1564,48 @@ public class ObjectUpdateBuilder
 					data.WriteInt32(unit.MaxPower[pi].Value);
 				}
 				// ModPowerRegen[pi] (bits 157+) — not tracked, skip
+			}
+		}
+		// VirtualItems (parent bit 167, elements 168-170) — not tracked in updates, skip
+		// AttackRoundBaseTime array (parent bit 171, elements 172-173) — block 5
+		if ((blockMasks[171 / 32] & (1u << (171 % 32))) != 0)
+		{
+			if (unit.AttackRoundBaseTime != null)
+			{
+				for (int i = 0; i < unit.AttackRoundBaseTime.Length && i < 2; i++)
+				{
+					if (unit.AttackRoundBaseTime[i].HasValue)
+						data.WriteUInt32(unit.AttackRoundBaseTime[i].Value);
+				}
+			}
+		}
+		// Stats/StatPosBuff/StatNegBuff (parent bit 174, interleaved per TC343) — block 5
+		if ((blockMasks[174 / 32] & (1u << (174 % 32))) != 0)
+		{
+			for (int i = 0; i < 5; i++)
+			{
+				if (unit.Stats != null && unit.Stats[i].HasValue) data.WriteInt32(unit.Stats[i].Value);
+				if (unit.StatPosBuff != null && unit.StatPosBuff[i].HasValue) data.WriteInt32(unit.StatPosBuff[i].Value);
+				if (unit.StatNegBuff != null && unit.StatNegBuff[i].HasValue) data.WriteInt32(unit.StatNegBuff[i].Value);
+			}
+		}
+		// Resistances/PowerCostModifier/PowerCostMultiplier (parent bit 190, spans blocks 5-6)
+		if ((blockMasks[190 / 32] & (1u << (190 % 32))) != 0)
+		{
+			for (int i = 0; i < 7; i++)
+			{
+				if (unit.Resistances != null && unit.Resistances[i].HasValue) data.WriteInt32(unit.Resistances[i].Value);
+				if (unit.PowerCostModifier != null && unit.PowerCostModifier[i].HasValue) data.WriteInt32(unit.PowerCostModifier[i].Value);
+				if (unit.PowerCostMultiplier != null && unit.PowerCostMultiplier[i].HasValue) data.WriteFloat(unit.PowerCostMultiplier[i].Value);
+			}
+		}
+		// ResistanceBuffMods (parent bit 212, elements 213-226, spans blocks 6-7)
+		if ((blockMasks[212 / 32] & (1u << (212 % 32))) != 0)
+		{
+			for (int i = 0; i < 7; i++)
+			{
+				if (unit.ResistanceBuffModsPositive != null && unit.ResistanceBuffModsPositive[i].HasValue) data.WriteInt32(unit.ResistanceBuffModsPositive[i].Value);
+				if (unit.ResistanceBuffModsNegative != null && unit.ResistanceBuffModsNegative[i].HasValue) data.WriteInt32(unit.ResistanceBuffModsNegative[i].Value);
 			}
 		}
 		void SetBit(int idx)

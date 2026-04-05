@@ -9128,6 +9128,31 @@ public class WorldClient
 				if (updateData2.UnitData != null && updateData2.UnitData.MaxPower != null)
 					for (int p = 0; p < updateData2.UnitData.MaxPower.Length; p++)
 						if (updateData2.UnitData.MaxPower[p].HasValue) { hasAnythingToSend = true; break; }
+				// Check stat/resistance/combat fields
+				if (updateData2.UnitData != null)
+				{
+					var u = updateData2.UnitData;
+					if (u.AttackPower.HasValue || u.RangedAttackPower.HasValue ||
+						u.AttackPowerModPos.HasValue || u.AttackPowerModNeg.HasValue ||
+						u.ShapeshiftForm.HasValue || u.BaseMana.HasValue || u.BaseHealth.HasValue ||
+						u.EmoteState.HasValue || u.SheatheState.HasValue ||
+						u.ModCastSpeed.HasValue || u.ModCastHaste.HasValue ||
+						u.MinDamage.HasValue || u.MaxDamage.HasValue ||
+						u.MountDisplayID.HasValue || u.GuildGUID != null)
+						hasAnythingToSend = true;
+					if (u.Stats != null)
+						for (int s = 0; s < u.Stats.Length; s++)
+							if (u.Stats[s].HasValue) { hasAnythingToSend = true; break; }
+					if (u.Resistances != null)
+						for (int r = 0; r < 7; r++)
+							if (u.Resistances[r].HasValue) { hasAnythingToSend = true; break; }
+					if (u.ResistanceBuffModsPositive != null)
+						for (int r = 0; r < 7; r++)
+							if (u.ResistanceBuffModsPositive[r].HasValue) { hasAnythingToSend = true; break; }
+					if (u.ResistanceBuffModsNegative != null)
+						for (int r = 0; r < 7; r++)
+							if (u.ResistanceBuffModsNegative[r].HasValue) { hasAnythingToSend = true; break; }
+				}
 				// Skip all Item-only Values updates - WriteUpdateItemData crashes client
 				if (guid3.IsItem())
 					hasAnythingToSend = false;
@@ -9151,9 +9176,38 @@ public class WorldClient
 					if (pd.QuestLog != null)
 						for (int q = 0; q < pd.QuestLog.Length; q++)
 							if (pd.QuestLog[q] != null && pd.QuestLog[q].QuestID.HasValue) { hasAnythingToSend = true; break; }
+					if (pd.VisibleItems != null)
+						for (int v = 0; v < pd.VisibleItems.Length; v++)
+							if (pd.VisibleItems[v] != null) { hasAnythingToSend = true; break; }
 				}
 				if (hasAnythingToSend)
 				{
+					// Debug: log stat/resistance updates for the player
+					if (guid3 == this.GetSession().GameState.CurrentPlayerGuid && updateData2.UnitData != null)
+					{
+						var u = updateData2.UnitData;
+						string statInfo = "";
+						if (u.Stats != null)
+							for (int si = 0; si < u.Stats.Length; si++)
+								if (u.Stats[si].HasValue) statInfo += $" Stat{si}={u.Stats[si].Value}";
+						if (u.Resistances != null)
+							for (int ri = 0; ri < 7; ri++)
+								if (u.Resistances[ri].HasValue) statInfo += $" Res{ri}={u.Resistances[ri].Value}";
+						if (u.AttackPower.HasValue) statInfo += $" AP={u.AttackPower.Value}";
+						if (u.BaseMana.HasValue) statInfo += $" BaseMana={u.BaseMana.Value}";
+						if (u.BaseHealth.HasValue) statInfo += $" BaseHP={u.BaseHealth.Value}";
+						if (statInfo.Length > 0)
+							Log.Print(LogType.Debug, $"[PlayerUpdate] SENDING stats:{statInfo}", "HandleUpdateObject", "");
+						if (updateData2.PlayerData?.VisibleItems != null)
+						{
+							string visInfo = "";
+							for (int vi = 0; vi < updateData2.PlayerData.VisibleItems.Length; vi++)
+								if (updateData2.PlayerData.VisibleItems[vi] != null)
+									visInfo += $" Slot{vi}=ItemID:{updateData2.PlayerData.VisibleItems[vi].ItemID}";
+							if (visInfo.Length > 0)
+								Log.Print(LogType.Debug, $"[PlayerUpdate] SENDING visItems:{visInfo}", "HandleUpdateObject", "");
+						}
+					}
 					updateObject.ObjectUpdates.Add(updateData2);
 				}
 				else if (guid3 == this.GetSession().GameState.CurrentPlayerGuid)
@@ -10910,7 +10964,11 @@ public class WorldClient
 					}
 				}
 			}
+			// 3.3.5a uses individual names (RESISTANCES_ARMOR=99..RESISTANCES_ARCANE=105)
+			// not the generic UNIT_FIELD_RESISTANCES. Fall back to _ARMOR as base.
 			int UNIT_FIELD_RESISTANCES = LegacyVersion.GetUpdateField(UnitField.UNIT_FIELD_RESISTANCES);
+			if (UNIT_FIELD_RESISTANCES < 0)
+				UNIT_FIELD_RESISTANCES = LegacyVersion.GetUpdateField(UnitField.UNIT_FIELD_RESISTANCES_ARMOR);
 			if (UNIT_FIELD_RESISTANCES >= 0)
 			{
 				for (int i12 = 0; i12 < 7; i12++)
@@ -10922,6 +10980,8 @@ public class WorldClient
 				}
 			}
 			int UNIT_FIELD_RESISTANCEBUFFMODSPOSITIVE = LegacyVersion.GetUpdateField(UnitField.UNIT_FIELD_RESISTANCEBUFFMODSPOSITIVE);
+			if (UNIT_FIELD_RESISTANCEBUFFMODSPOSITIVE < 0)
+				UNIT_FIELD_RESISTANCEBUFFMODSPOSITIVE = LegacyVersion.GetUpdateField(UnitField.UNIT_FIELD_RESISTANCEBUFFMODSPOSITIVE_ARMOR);
 			if (UNIT_FIELD_RESISTANCEBUFFMODSPOSITIVE >= 0)
 			{
 				for (int i13 = 0; i13 < 7; i13++)
@@ -10933,6 +10993,8 @@ public class WorldClient
 				}
 			}
 			int UNIT_FIELD_RESISTANCEBUFFMODSNEGATIVE = LegacyVersion.GetUpdateField(UnitField.UNIT_FIELD_RESISTANCEBUFFMODSNEGATIVE);
+			if (UNIT_FIELD_RESISTANCEBUFFMODSNEGATIVE < 0)
+				UNIT_FIELD_RESISTANCEBUFFMODSNEGATIVE = LegacyVersion.GetUpdateField(UnitField.UNIT_FIELD_RESISTANCEBUFFMODSNEGATIVE_ARMOR);
 			if (UNIT_FIELD_RESISTANCEBUFFMODSNEGATIVE >= 0)
 			{
 				for (int i14 = 0; i14 < 7; i14++)
