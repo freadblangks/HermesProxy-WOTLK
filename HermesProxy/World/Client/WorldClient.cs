@@ -6834,15 +6834,10 @@ public class WorldClient
 	{
 		ClientGossipQuest quest = new ClientGossipQuest();
 		quest.QuestID = packet.ReadUInt32();
-		QuestGiverStatusModern dialogStatus = LegacyVersion.ConvertQuestGiverStatus((byte)packet.ReadInt32());
-		if (dialogStatus.HasAnyFlag(QuestGiverStatusModern.LowLevelAvailable | QuestGiverStatusModern.LowLevelAvailableRep | QuestGiverStatusModern.AvailableRep | QuestGiverStatusModern.Available | QuestGiverStatusModern.AvailableLegendaryQuest | QuestGiverStatusModern.AvailableJourney | QuestGiverStatusModern.AvailableCovenantCalling))
-		{
-			quest.QuestType = 2;
-		}
-		else
-		{
-			quest.QuestType = 4;
-		}
+		// Icon value from server: 0=autocomplete, 2=available, 4=completable
+		// Use directly as QuestType - do NOT convert through QuestGiverStatus enum
+		int questIcon = packet.ReadInt32();
+		quest.QuestType = questIcon;
 		quest.QuestLevel = packet.ReadInt32();
 		if (LegacyVersion.AddedInVersion(ClientVersionBuild.V3_3_3_11685))
 		{
@@ -8779,10 +8774,9 @@ public class WorldClient
 				}
 				if (guid3 == this.GetSession().GameState.CurrentPlayerGuid)
 				{
-					// PlayerData must be null - empty Player block (0x40) corrupts the packet
+					// Keep PlayerData for WriteUpdatePlayerData (quest log, flags, etc.)
 					// Keep useful UnitData fields; strip the rest + Power (sent via SMSG_POWER_UPDATE)
 					updateData2.ObjectData = new ObjectData();
-					updateData2.PlayerData = null;
 					if (updateData2.UnitData != null)
 					{
 						// Keep: Health, MaxHealth, Level, EffectiveLevel, DisplayID, Target, Flags, Flags2
@@ -8839,6 +8833,15 @@ public class WorldClient
 					ActivePlayerData a = updateData2.ActivePlayerData;
 					if (a.Coinage.HasValue || a.XP.HasValue || a.NextLevelXP.HasValue)
 						hasAnythingToSend = true;
+				}
+				if (updateData2.PlayerData != null)
+				{
+					PlayerData pd = updateData2.PlayerData;
+					if (pd.PlayerFlags.HasValue || pd.PlayerFlagsEx.HasValue || pd.ChosenTitle.HasValue || pd.GuildTimeStamp.HasValue)
+						hasAnythingToSend = true;
+					if (pd.QuestLog != null)
+						for (int q = 0; q < pd.QuestLog.Length; q++)
+							if (pd.QuestLog[q] != null && pd.QuestLog[q].QuestID.HasValue) { hasAnythingToSend = true; break; }
 				}
 				if (hasAnythingToSend)
 				{

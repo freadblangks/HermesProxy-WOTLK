@@ -215,7 +215,8 @@ public class ObjectUpdateBuilder
 		{
 			effectiveMask &= ~ObjectTypeMask.ActivePlayer;
 		}
-		byte updateFieldFlags = (byte)(this.IsOwner ? 1 : 0);
+		// Owner=0x01, PartyMember=0x02 (needed for QuestLog visibility)
+		byte updateFieldFlags = (byte)(this.IsOwner ? 0x03 : 0);
 		Log.Print(LogType.Debug, $"[ValuesCreate] type={this.m_objectType} flags=0x{updateFieldFlags:X2} IsOwner={this.IsOwner}", "WriteValuesCreate", "F:\\Ampps\\HermesProxy-master\\HermesProxy\\World\\Objects\\Version\\V3_4_3_54261\\ObjectUpdateBuilder.cs");
 		data.WriteUInt8(updateFieldFlags);
 		int sectionStart = data.GetData().Length;
@@ -485,8 +486,7 @@ public class ObjectUpdateBuilder
 			changedMask |= 0x20;
 		}
 		// Only set Player block when there are actual PlayerData changes (matching TC343)
-		// Writing an empty Player block (blocksMask=0) corrupts the packet for the client
-		bool hasPlayerChanges = this.m_objectTypeMask.HasAnyFlag(ObjectTypeMask.Player) && this.m_updateData.PlayerData != null;
+		bool hasPlayerChanges = this.m_objectTypeMask.HasAnyFlag(ObjectTypeMask.Player) && this.HasAnyPlayerFieldSet();
 		if (hasPlayerChanges)
 		{
 			changedMask |= 0x40;
@@ -495,6 +495,9 @@ public class ObjectUpdateBuilder
 		{
 			changedMask |= 0x80;
 		}
+		// Safety: if changedMask is 0, nothing to write
+		if (changedMask == 0)
+			return;
 		data.WriteUInt32(changedMask);
 		if (hasObjectChanges)
 		{
@@ -510,10 +513,7 @@ public class ObjectUpdateBuilder
 		}
 		if (hasPlayerChanges)
 		{
-			// Empty PlayerData: blocksMask=0 (4 bits), IsQuestLogChangesMaskSkipped=false (1 bit), FlushBits
-			data.WriteBits(0, 4);
-			data.WriteBit(false);
-			data.FlushBits();
+			this.WriteUpdatePlayerData(data);
 		}
 		if (hasActivePlayerChanges)
 		{
@@ -1129,14 +1129,19 @@ public class ObjectUpdateBuilder
 		}
 		if (unit.NpcFlags != null)
 		{
+			bool hasAnyNpcFlag = false;
 			for (int i = 0; i < unit.NpcFlags.Length; i++)
 			{
 				if (unit.NpcFlags[i].HasValue && unit.NpcFlags[i] != 0)
 				{
 					SetBit(114 + i);
+					hasAnyNpcFlag = true;
 				}
 			}
+			if (hasAnyNpcFlag)
+				SetBit(113); // parent bit for NpcFlags array
 		}
+		bool hasAnyPowerGroup = false;
 		if (unit.Power != null)
 		{
 			for (int j = 0; j < unit.Power.Length; j++)
@@ -1144,6 +1149,7 @@ public class ObjectUpdateBuilder
 				if (unit.Power[j].HasValue)
 				{
 					SetBit(137 + j);
+					hasAnyPowerGroup = true;
 				}
 			}
 		}
@@ -1154,9 +1160,12 @@ public class ObjectUpdateBuilder
 				if (unit.MaxPower[k].HasValue)
 				{
 					SetBit(147 + k);
+					hasAnyPowerGroup = true;
 				}
 			}
 		}
+		if (hasAnyPowerGroup)
+			SetBit(116); // parent bit for Power/MaxPower/Regen arrays
 		for (int bi = 0; bi < 8; bi++)
 		{
 			if (blockMasks[bi] != 0)
@@ -1290,39 +1299,43 @@ public class ObjectUpdateBuilder
 		{
 			data.WriteFloat(unit.HoverHeight.Value);
 		}
-		if ((blocksMask & 8) != 0 && unit.GuildGUID != null)
+		if ((blocksMask & 8) != 0)
 		{
-			data.WritePackedGuid128(unit.GuildGUID);
-		}
-		if (unit.NpcFlags != null)
-		{
-			for (int n = 0; n < unit.NpcFlags.Length; n++)
+			if (unit.GuildGUID != null)
 			{
-				if (unit.NpcFlags[n].HasValue && unit.NpcFlags[n] != 0)
+				data.WritePackedGuid128(unit.GuildGUID);
+			}
+			// NpcFlags array (parent bit 113, elements 114-115) — gated by block 3
+			if (unit.NpcFlags != null)
+			{
+				for (int n = 0; n < unit.NpcFlags.Length; n++)
 				{
-					data.WriteUInt32(unit.NpcFlags[n].Value);
+					if (unit.NpcFlags[n].HasValue && unit.NpcFlags[n] != 0)
+					{
+						data.WriteUInt32(unit.NpcFlags[n].Value);
+					}
 				}
 			}
 		}
-		if (unit.Power != null)
+		// Power group (parent bit 116) — TC343 interleaves all power arrays per-index
+		if ((blocksMask & 0x10) != 0)
 		{
-			for (int num = 0; num < unit.Power.Length; num++)
+			int maxLen = 0;
+			if (unit.Power != null && unit.Power.Length > maxLen) maxLen = unit.Power.Length;
+			if (unit.MaxPower != null && unit.MaxPower.Length > maxLen) maxLen = unit.MaxPower.Length;
+			for (int pi = 0; pi < maxLen; pi++)
 			{
-				if (unit.Power[num].HasValue)
+				// PowerRegenFlatModifier[pi] (bits 117+) — not tracked, skip
+				// PowerRegenInterruptedFlatModifier[pi] (bits 127+) — not tracked, skip
+				if (unit.Power != null && pi < unit.Power.Length && unit.Power[pi].HasValue)
 				{
-					data.WriteInt32(unit.Power[num].Value);
+					data.WriteInt32(unit.Power[pi].Value);
 				}
-			}
-		}
-		if (unit.MaxPower == null)
-		{
-			return;
-		}
-		for (int num2 = 0; num2 < unit.MaxPower.Length; num2++)
-		{
-			if (unit.MaxPower[num2].HasValue)
-			{
-				data.WriteInt32(unit.MaxPower[num2].Value);
+				if (unit.MaxPower != null && pi < unit.MaxPower.Length && unit.MaxPower[pi].HasValue)
+				{
+					data.WriteInt32(unit.MaxPower[pi].Value);
+				}
+				// ModPowerRegen[pi] (bits 157+) — not tracked, skip
 			}
 		}
 		void SetBit(int idx)
@@ -1370,6 +1383,21 @@ public class ObjectUpdateBuilder
 		data.WriteInt32(0);
 		data.WriteUInt32(player.DuelTeam.GetValueOrDefault());
 		data.WriteInt32(player.GuildTimeStamp.GetValueOrDefault());
+		// QuestLog[25] - gated by PartyMember flag (0x02) in TC343
+		if (this.IsOwner)
+		{
+			for (int q = 0; q < 25; q++)
+			{
+				QuestLog quest = (player.QuestLog != null && q < player.QuestLog.Length) ? player.QuestLog[q] : null;
+				data.WriteInt64(quest?.EndTime ?? 0);
+				data.WriteInt32(quest?.QuestID ?? 0);
+				data.WriteUInt32(quest?.StateFlags ?? 0);
+				for (int obj = 0; obj < 24; obj++)
+				{
+					data.WriteUInt16((ushort)(quest?.ObjectiveProgress[obj] ?? 0));
+				}
+			}
+		}
 		for (int j = 0; j < 19; j++)
 		{
 			if (player.VisibleItems != null && j < player.VisibleItems.Length && player.VisibleItems[j] != null)
@@ -1416,6 +1444,133 @@ public class ObjectUpdateBuilder
 		data.WriteFloat(0f);
 		data.WriteFloat(0f);
 		data.WriteUInt32(0u);
+	}
+
+	private bool HasAnyPlayerFieldSet()
+	{
+		PlayerData p = this.m_updateData.PlayerData;
+		if (p == null) return false;
+		// Check quest log entries (including cleared slots with QuestID=0)
+		if (p.QuestLog != null)
+			for (int i = 0; i < p.QuestLog.Length; i++)
+				if (p.QuestLog[i] != null && p.QuestLog[i].QuestID.HasValue) return true;
+		// Check scalar fields
+		if (p.PlayerFlags.HasValue || p.PlayerFlagsEx.HasValue) return true;
+		if (p.ChosenTitle.HasValue) return true;
+		if (p.GuildTimeStamp.HasValue) return true;
+		// Check visible items
+		if (p.VisibleItems != null)
+			for (int i = 0; i < p.VisibleItems.Length; i++)
+				if (p.VisibleItems[i] != null) return true;
+		return false;
+	}
+
+	private void WriteUpdatePlayerData(WorldPacket data)
+	{
+		PlayerData p = this.m_updateData.PlayerData ?? new PlayerData();
+
+		// TC343 PlayerData: HasChangesMask<108>, 4 blocks of 32 bits
+		// Block 0 (bits 0-31): dynamic[1-3] + scalar[4-31]
+		// Block 1 (bits 32-63): PartyType[33-34], QuestLog hasAny[35], QuestLog[36-60], VisibleItems hasAny[61], VisibleItems[62-63]
+		// Block 2 (bits 64-95): VisibleItems[64-80], AvgItemLevel hasAny[81], AvgItemLevel[82-87], Field_3120 hasAny[88], Field_3120[89-95]
+		// Block 3 (bits 96-107): Field_3120[96-107]
+		uint[] blocks = new uint[4];
+
+		// Block 0: scalar fields
+		if (p.PlayerFlags.HasValue) { blocks[0] |= (1u << 0) | (1u << 7); }
+		if (p.PlayerFlagsEx.HasValue) { blocks[0] |= (1u << 0) | (1u << 8); }
+		if (p.GuildTimeStamp.HasValue) { blocks[0] |= (1u << 0) | (1u << 20); }
+		if (p.ChosenTitle.HasValue) { blocks[0] |= (1u << 0) | (1u << 21); }
+
+		// Block 1-2: QuestLog (bits 35-60) and VisibleItems (bits 61-80)
+		bool hasAnyQuestLog = false;
+		for (int i = 0; i < 25; i++)
+		{
+			if (p.QuestLog[i] != null && p.QuestLog[i].QuestID.HasValue)
+			{
+				int bit = 36 + i;
+				blocks[bit / 32] |= (1u << (bit % 32));
+				blocks[35 / 32] |= (1u << (35 % 32)); // hasAny flag
+				hasAnyQuestLog = true;
+			}
+		}
+		bool hasAnyVisibleItem = false;
+		for (int i = 0; i < 19; i++)
+		{
+			if (p.VisibleItems != null && i < p.VisibleItems.Length && p.VisibleItems[i] != null)
+			{
+				int bit = 62 + i;
+				blocks[bit / 32] |= (1u << (bit % 32));
+				blocks[61 / 32] |= (1u << (61 % 32)); // hasAny flag
+				hasAnyVisibleItem = true;
+			}
+		}
+
+		// Write blocksMask (4 bits)
+		byte blocksMask = 0;
+		for (int i = 0; i < 4; i++)
+			if (blocks[i] != 0) blocksMask |= (byte)(1 << i);
+
+		data.WriteBits(blocksMask, 4);
+		for (int i = 0; i < 4; i++)
+			if ((blocksMask & (1 << i)) != 0)
+				data.WriteBits(blocks[i], 32);
+
+		// IsQuestLogChangesMaskSkipped = true → use WriteCreate format for quest entries
+		data.WriteBit(true);
+
+		// No dynamic fields (bits 1-3 of block 0 not set, so no masks needed)
+		data.FlushBits();
+
+		// Block 0: scalar field values in bit order
+		if ((blocks[0] & (1u << 0)) != 0)
+		{
+			if ((blocks[0] & (1u << 7)) != 0)
+				data.WriteUInt32(p.PlayerFlags.Value);
+			if ((blocks[0] & (1u << 8)) != 0)
+				data.WriteUInt32(p.PlayerFlagsEx.Value);
+			if ((blocks[0] & (1u << 20)) != 0)
+				data.WriteInt32(p.GuildTimeStamp.Value);
+			if ((blocks[0] & (1u << 21)) != 0)
+				data.WriteInt32(p.ChosenTitle.Value);
+		}
+
+		// QuestLog entries (bits 35-60) — WriteCreate format
+		if (hasAnyQuestLog)
+		{
+			for (int i = 0; i < 25; i++)
+			{
+				int bit = 36 + i;
+				if ((blocks[bit / 32] & (1u << (bit % 32))) != 0)
+				{
+					QuestLog quest = p.QuestLog[i];
+					data.WriteInt64(quest?.EndTime ?? 0);
+					data.WriteInt32(quest?.QuestID ?? 0);
+					data.WriteUInt32(quest?.StateFlags ?? 0);
+					for (int obj = 0; obj < 24; obj++)
+						data.WriteUInt16((ushort)(quest?.ObjectiveProgress[obj] ?? 0));
+				}
+			}
+		}
+
+		// VisibleItems (bits 61-80) — TC343 VisibleItem::WriteUpdate uses WriteBits(mask, 4)
+		if (hasAnyVisibleItem)
+		{
+			for (int i = 0; i < 19; i++)
+			{
+				int bit = 62 + i;
+				if ((blocks[bit / 32] & (1u << (bit % 32))) != 0)
+				{
+					VisibleItem item = p.VisibleItems[i];
+					// VisibleItem has HasChangesMask<4>: bit 0=hasAny, 1=ItemID, 2=AppearanceModID, 3=ItemVisual
+					data.WriteBits(0x0F, 4); // all 4 bits set
+					data.FlushBits();
+					data.WriteInt32(item.ItemID);
+					data.WriteUInt16(item.ItemAppearanceModID);
+					data.WriteUInt16(item.ItemVisual);
+				}
+			}
+		}
 	}
 
 	private void WriteEmptyQuestLog(WorldPacket data)
