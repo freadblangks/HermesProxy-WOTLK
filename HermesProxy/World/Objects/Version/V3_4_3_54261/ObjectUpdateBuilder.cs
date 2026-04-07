@@ -922,7 +922,22 @@ public class ObjectUpdateBuilder
 		for (int l = 0; l < 3; l++)
 		{
 			VisibleItem[] virtualItems = unit.VirtualItems;
-			data.WriteInt32((((virtualItems != null) ? virtualItems[l] : null) != null) ? unit.VirtualItems[l].ItemID : 0);
+			int vItemId = (((virtualItems != null) ? virtualItems[l] : null) != null) ? unit.VirtualItems[l].ItemID : 0;
+			// For players, VirtualItems may not be set by the server (players use PLAYER_VISIBLE_ITEM).
+			// Populate from PlayerData.VisibleItems: slot 0=mainhand(15), 1=offhand(16), 2=ranged(17)
+			if (vItemId == 0 && this.IsOwner && this.m_updateData.PlayerData?.VisibleItems != null)
+			{
+				int playerSlot = 15 + l; // mainhand=15, offhand=16, ranged=17
+				if (playerSlot < this.m_updateData.PlayerData.VisibleItems.Length)
+				{
+					var pv = this.m_updateData.PlayerData.VisibleItems[playerSlot];
+					if (pv != null && pv.ItemID != 0)
+					{
+						vItemId = pv.ItemID;
+					}
+				}
+			}
+			data.WriteInt32(vItemId);
 			data.WriteUInt16(0);
 			data.WriteUInt16(0);
 		}
@@ -937,7 +952,16 @@ public class ObjectUpdateBuilder
 		}
 		if (this.IsOwner)
 		{
-			data.WriteUInt32(unit.RangedAttackRoundBaseTime.GetValueOrDefault());
+			uint rangedTime = unit.RangedAttackRoundBaseTime.GetValueOrDefault();
+			// If server didn't send ranged attack time but player has a ranged weapon visible,
+			// default to 2300ms (standard bow speed) so the client enables Auto Shot
+			if (rangedTime == 0 && this.m_updateData.PlayerData?.VisibleItems != null)
+			{
+				var rangedVisible = this.m_updateData.PlayerData.VisibleItems.Length > 17 ? this.m_updateData.PlayerData.VisibleItems[17] : null;
+				if (rangedVisible != null && rangedVisible.ItemID != 0)
+					rangedTime = 2300;
+			}
+			data.WriteUInt32(rangedTime);
 		}
 		data.WriteFloat(unit.BoundingRadius ?? 0.389f);
 		data.WriteFloat(unit.CombatReach ?? 1.5f);

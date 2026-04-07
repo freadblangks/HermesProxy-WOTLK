@@ -1,0 +1,20 @@
+using HermesProxy.World.Enums;
+
+namespace HermesProxy.World.Server.Packets;
+
+public class AchievementDeleted : ServerPacket
+{
+	public uint AchievementID;
+	public uint Immunities;
+
+	public AchievementDeleted()
+		: base(Opcode.SMSG_ACHIEVEMENT_DELETED)
+	{
+	}
+
+	public override void Write()
+	{
+		base._worldPacket.WriteUInt32(this.AchievementID);
+		base._worldPacket.WriteUInt32(this.Immunities);
+	}
+}

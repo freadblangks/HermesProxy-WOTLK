@@ -102,8 +102,13 @@ internal class AttackerStateUpdate : ServerPacket
 		attackRoundInfo.WriteUInt8(this.ContentTuning.TargetLevel);
 		attackRoundInfo.WriteUInt8(this.ContentTuning.Expansion);
 		attackRoundInfo.WriteInt16(this.ContentTuning.PlayerLevelDelta);
+		attackRoundInfo.WriteInt8(this.ContentTuning.TargetScalingLevelDelta);
 		attackRoundInfo.WriteFloat(this.ContentTuning.PlayerItemLevel);
 		attackRoundInfo.WriteFloat(this.ContentTuning.TargetItemLevel);
+		attackRoundInfo.WriteUInt32(this.ContentTuning.ScalingHealthItemLevelCurveID);
+		attackRoundInfo.WriteUInt32((uint)this.ContentTuning.Flags);
+		attackRoundInfo.WriteInt32(0); // PlayerContentTuningID
+		attackRoundInfo.WriteInt32(0); // TargetContentTuningID
 		base._worldPacket.WriteBit(this.LogData != null);
 		if (this.LogData != null)
 		{

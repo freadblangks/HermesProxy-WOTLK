@@ -20,15 +20,8 @@ internal class SpecialMountAnim : ServerPacket
 	public override void Write()
 	{
 		base._worldPacket.WritePackedGuid128(this.UnitGUID);
-		if (!ModernVersion.AddedInVersion(9, 0, 5, 1, 14, 0, 2, 5, 1))
-		{
-			return;
-		}
 		base._worldPacket.WriteInt32(this.SpellVisualKitIDs.Count);
-		if (ModernVersion.AddedInVersion(9, 2, 0, 1, 14, 2, 2, 5, 3))
-		{
-			base._worldPacket.WriteInt32(this.SequenceVariation);
-		}
+		base._worldPacket.WriteInt32(this.SequenceVariation);
 		foreach (int id in this.SpellVisualKitIDs)
 		{
 			base._worldPacket.WriteInt32(id);

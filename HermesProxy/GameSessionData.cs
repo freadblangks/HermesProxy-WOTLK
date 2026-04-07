@@ -922,6 +922,18 @@ public class GameSessionData
 		return updates[fieldIndex].FloatValue;
 	}
 
+	public bool HasRangedWeapon()
+	{
+		if (this.CurrentPlayerGuid == null) return false;
+		var updates = this.GetCachedObjectFieldsLegacy(this.CurrentPlayerGuid);
+		if (updates == null) return false;
+		int PLAYER_VISIBLE_ITEM_1_ENTRYID = LegacyVersion.GetUpdateField(PlayerField.PLAYER_VISIBLE_ITEM_1_ENTRYID);
+		if (PLAYER_VISIBLE_ITEM_1_ENTRYID < 0) return false;
+		int offset = LegacyVersion.AddedInVersion(ClientVersionBuild.V3_0_2_9056) ? 2 : (LegacyVersion.AddedInVersion(ClientVersionBuild.V2_0_1_6180) ? 16 : 12);
+		int rangedIdx = PLAYER_VISIBLE_ITEM_1_ENTRYID + 17 * offset;
+		return updates.ContainsKey(rangedIdx) && updates[rangedIdx].UInt32Value != 0;
+	}
+
 	public Dictionary<int, UpdateField> GetCachedObjectFieldsLegacy(WowGuid128 guid)
 	{
 		this.ObjectCacheMutex.WaitOne();

@@ -2000,6 +2000,18 @@ public class WorldClient
 		this.SendPacketToServer(packet);
 	}
 
+	private bool IsLocalPlayerOrPet(WowGuid128 guid)
+	{
+		if (guid == null) return false;
+		return guid == this.GetSession().GameState.CurrentPlayerGuid ||
+		       guid == this.GetSession().GameState.CurrentPetGuid;
+	}
+
+	private bool IsLocalPlayerInvolved(WowGuid128 a, WowGuid128 b)
+	{
+		return IsLocalPlayerOrPet(a) || IsLocalPlayerOrPet(b);
+	}
+
 	[PacketHandler(Opcode.SMSG_ATTACK_START)]
 	private void HandleAttackStart(WorldPacket packet)
 	{
@@ -2026,6 +2038,349 @@ public class WorldClient
 			attack.NowDead = packet.ReadUInt32() != 0;
 		}
 		this.SendPacketToClient(attack);
+	}
+
+	[PacketHandler(Opcode.SMSG_HIGHEST_THREAT_UPDATE)]
+	private void HandleHighestThreatUpdate(WorldPacket packet)
+	{
+		// Consume packet to prevent "No handler" warning — client doesn't need this
+		WowGuid128 unitGuid = packet.ReadPackedGuid().To128(this.GetSession().GameState);
+		Log.Print(LogType.Debug, $"[Combat] HIGHEST_THREAT_UPDATE unit={unitGuid} (consumed, not forwarded)", "HandleHighestThreatUpdate", "");
+	}
+
+	[PacketHandler(Opcode.SMSG_THREAT_CLEAR)]
+	private void HandleThreatClear(WorldPacket packet)
+	{
+		// Consume packet to prevent "No handler" warning — client doesn't need this
+		WowGuid128 unitGuid = packet.ReadPackedGuid().To128(this.GetSession().GameState);
+		Log.Print(LogType.Debug, $"[Combat] THREAT_CLEAR unit={unitGuid} (consumed, not forwarded)", "HandleThreatClear", "");
+	}
+
+	[PacketHandler(Opcode.SMSG_THREAT_UPDATE)]
+	private void HandleThreatUpdate(WorldPacket packet)
+	{
+		// Consume packet to prevent "No handler" warning — client doesn't need this
+		WowGuid128 unitGuid = packet.ReadPackedGuid().To128(this.GetSession().GameState);
+		Log.Print(LogType.Debug, $"[Combat] THREAT_UPDATE unit={unitGuid} (consumed, not forwarded)", "HandleThreatUpdate", "");
+	}
+
+	[PacketHandler(Opcode.SMSG_THREAT_REMOVE)]
+	private void HandleThreatRemove(WorldPacket packet)
+	{
+		ThreatRemove threat = new ThreatRemove();
+		threat.UnitGUID = packet.ReadPackedGuid().To128(this.GetSession().GameState);
+		threat.AboutGUID = packet.ReadPackedGuid().To128(this.GetSession().GameState);
+		this.SendPacketToClient(threat);
+	}
+
+	[PacketHandler(Opcode.SMSG_HEALTH_UPDATE)]
+	private void HandleHealthUpdate(WorldPacket packet)
+	{
+		HealthUpdate health = new HealthUpdate();
+		health.Guid = packet.ReadPackedGuid().To128(this.GetSession().GameState);
+		health.Health = packet.ReadUInt32();
+		this.SendPacketToClient(health);
+	}
+
+	[PacketHandler(Opcode.SMSG_PET_ACTION_FEEDBACK)]
+	private void HandlePetActionFeedback(WorldPacket packet)
+	{
+		PetActionFeedback feedback = new PetActionFeedback();
+		feedback.Response = packet.ReadUInt8();
+		feedback.SpellID = 0;
+		this.SendPacketToClient(feedback);
+	}
+
+	[PacketHandler(Opcode.SMSG_PET_TAME_FAILURE)]
+	private void HandlePetTameFailure(WorldPacket packet)
+	{
+		PetTameFailure tame = new PetTameFailure();
+		tame.Result = packet.ReadUInt8();
+		this.SendPacketToClient(tame);
+	}
+
+	[PacketHandler(Opcode.SMSG_PET_GUIDS)]
+	private void HandlePetGuids(WorldPacket packet)
+	{
+		PetGuids guids = new PetGuids();
+		uint count = packet.ReadUInt32();
+		for (uint i = 0; i < count; i++)
+		{
+			guids.Guids.Add(packet.ReadGuid().To128(this.GetSession().GameState));
+		}
+		this.SendPacketToClient(guids);
+	}
+
+	[PacketHandler(Opcode.SMSG_TITLE_EARNED)]
+	private void HandleTitleEarned(WorldPacket packet)
+	{
+		uint index = packet.ReadUInt32();
+		uint earned = packet.ReadUInt32();
+		TitleEarned title = new TitleEarned(earned != 0 ? Opcode.SMSG_TITLE_EARNED : Opcode.SMSG_TITLE_LOST);
+		title.Index = index;
+		this.SendPacketToClient(title);
+	}
+
+	[PacketHandler(Opcode.SMSG_MOUNT_RESULT)]
+	private void HandleMountResult(WorldPacket packet)
+	{
+		MountResult mount = new MountResult();
+		mount.Result = packet.ReadInt32();
+		this.SendPacketToClient(mount);
+	}
+
+	[PacketHandler(Opcode.SMSG_ACHIEVEMENT_DELETED)]
+	private void HandleAchievementDeleted(WorldPacket packet)
+	{
+		AchievementDeleted deleted = new AchievementDeleted();
+		deleted.AchievementID = packet.ReadUInt32();
+		deleted.Immunities = 0;
+		this.SendPacketToClient(deleted);
+	}
+
+	[PacketHandler(Opcode.SMSG_CRITERIA_DELETED)]
+	private void HandleCriteriaDeleted(WorldPacket packet)
+	{
+		CriteriaDeleted deleted = new CriteriaDeleted();
+		deleted.CriteriaID = packet.ReadUInt32();
+		this.SendPacketToClient(deleted);
+	}
+
+	[PacketHandler(Opcode.SMSG_GROUP_DESTROYED)]
+	private void HandleGroupDestroyed(WorldPacket packet)
+	{
+		GroupDestroyed destroyed = new GroupDestroyed();
+		this.SendPacketToClient(destroyed);
+	}
+
+	[PacketHandler(Opcode.SMSG_ON_CANCEL_EXPECTED_RIDE_VEHICLE_AURA)]
+	private void HandleOnCancelExpectedRideVehicleAura(WorldPacket packet)
+	{
+		OnCancelExpectedRideVehicleAura cancel = new OnCancelExpectedRideVehicleAura();
+		this.SendPacketToClient(cancel);
+	}
+
+	[PacketHandler(Opcode.SMSG_OVERRIDE_LIGHT)]
+	private void HandleOverrideLight(WorldPacket packet)
+	{
+		OverrideLight light = new OverrideLight();
+		light.AreaLightID = packet.ReadInt32();
+		light.OverrideLightID = packet.ReadInt32();
+		light.TransitionMilliseconds = packet.ReadInt32();
+		this.SendPacketToClient(light);
+	}
+
+	[PacketHandler(Opcode.SMSG_UPDATE_ACCOUNT_DATA)]
+	private void HandleUpdateAccountData(WorldPacket packet)
+	{
+		WowGuid64 guid = packet.ReadGuid();
+		uint type = packet.ReadUInt32();
+		uint time = packet.ReadUInt32();
+		uint size = packet.ReadUInt32();
+		byte[] compressedData = null;
+		if (packet.CanRead())
+		{
+			compressedData = packet.ReadToEnd();
+		}
+		AccountData data = new AccountData();
+		data.Guid = guid.To128(this.GetSession().GameState);
+		data.Type = type;
+		data.Timestamp = time;
+		data.UncompressedSize = size;
+		data.CompressedData = compressedData;
+		UpdateAccountData update = new UpdateAccountData(data);
+		this.SendPacketToClient(update);
+	}
+
+	[PacketHandler(Opcode.SMSG_UPDATE_LAST_INSTANCE)]
+	private void HandleUpdateLastInstance(WorldPacket packet)
+	{
+		UpdateLastInstance update = new UpdateLastInstance();
+		update.MapID = packet.ReadUInt32();
+		this.SendPacketToClient(update);
+	}
+
+	[PacketHandler(Opcode.SMSG_QUEST_POI_QUERY_RESPONSE)]
+	private void HandleQuestPOIQueryResponse(WorldPacket packet)
+	{
+		QuestPOIQueryResponse response = new QuestPOIQueryResponse();
+		uint questCount = packet.ReadUInt32();
+		for (uint q = 0; q < questCount; q++)
+		{
+			QuestPOIData questData = new QuestPOIData();
+			questData.QuestID = (int)packet.ReadUInt32();
+			uint poiCount = packet.ReadUInt32();
+			for (uint p = 0; p < poiCount; p++)
+			{
+				QuestPOIBlobData blob = new QuestPOIBlobData();
+				blob.BlobIndex = (int)packet.ReadUInt32();
+				blob.ObjectiveIndex = packet.ReadInt32();
+				blob.MapID = (int)packet.ReadUInt32();
+				blob.UiMapID = (int)packet.ReadUInt32(); // areaId in legacy
+				blob.Priority = 0;
+				blob.Flags = (int)packet.ReadUInt32(); // floorId in legacy
+				blob.WorldEffectID = 0;
+				blob.PlayerConditionID = 0;
+				blob.NavigationPlayerConditionID = 0;
+				blob.SpawnTrackingID = 0;
+				blob.QuestObjectiveID = 0;
+				blob.QuestObjectID = 0;
+				packet.ReadUInt32(); // Unk3
+				packet.ReadUInt32(); // Unk4
+				uint pointCount = packet.ReadUInt32();
+				for (uint pt = 0; pt < pointCount; pt++)
+				{
+					QuestPOIBlobPoint point = new QuestPOIBlobPoint();
+					point.X = (short)packet.ReadInt32();
+					point.Y = (short)packet.ReadInt32();
+					point.Z = 0;
+					blob.Points.Add(point);
+				}
+				questData.Blobs.Add(blob);
+			}
+			response.QuestPOIDataStats.Add(questData);
+		}
+		this.SendPacketToClient(response);
+	}
+
+	[PacketHandler(Opcode.SMSG_GM_TICKET_GET_SYSTEM_STATUS)]
+	private void HandleGMTicketSystemStatus(WorldPacket packet)
+	{
+		GMTicketSystemStatus status = new GMTicketSystemStatus();
+		status.Status = (int)packet.ReadUInt32();
+		this.SendPacketToClient(status);
+	}
+
+	[PacketHandler(Opcode.SMSG_LFG_DISABLED)]
+	private void HandleLfgDisabled(WorldPacket packet)
+	{
+		LfgDisabled disabled = new LfgDisabled();
+		this.SendPacketToClient(disabled);
+	}
+
+	[PacketHandler(Opcode.SMSG_LFG_OFFER_CONTINUE)]
+	private void HandleLfgOfferContinue(WorldPacket packet)
+	{
+		LfgOfferContinue offer = new LfgOfferContinue();
+		offer.Slot = packet.ReadUInt32();
+		this.SendPacketToClient(offer);
+	}
+
+	[PacketHandler(Opcode.SMSG_LFG_PLAYER_REWARD)]
+	private void HandleLfgPlayerReward(WorldPacket packet)
+	{
+		LfgPlayerReward reward = new LfgPlayerReward();
+		reward.QueuedSlot = packet.ReadUInt32(); // rdungeonEntry
+		reward.ActualSlot = packet.ReadUInt32(); // sdungeonEntry
+		byte done = packet.ReadUInt8();
+		packet.ReadUInt32(); // always 1
+		reward.RewardMoney = (int)packet.ReadUInt32();
+		reward.AddedXP = (int)packet.ReadUInt32();
+		packet.ReadUInt32(); // unknown
+		packet.ReadUInt32(); // unknown
+		byte itemNum = packet.ReadUInt8();
+		for (byte i = 0; i < itemNum; i++)
+		{
+			LfgPlayerRewardItem item = new LfgPlayerRewardItem();
+			item.ItemID = packet.ReadUInt32();
+			packet.ReadUInt32(); // displayId
+			item.Quantity = packet.ReadUInt32();
+			item.IsCurrency = false;
+			item.BonusCurrency = 0;
+			reward.Rewards.Add(item);
+		}
+		this.SendPacketToClient(reward);
+	}
+
+	[PacketHandler(Opcode.SMSG_LFG_ROLE_CHECK_UPDATE)]
+	private void HandleLfgRoleCheckUpdate(WorldPacket packet)
+	{
+		LfgRoleCheckUpdate roleCheck = new LfgRoleCheckUpdate();
+		roleCheck.PartyIndex = 0;
+		roleCheck.RoleCheckStatus = (byte)packet.ReadUInt32(); // state
+		roleCheck.IsBeginning = packet.ReadBool();
+		roleCheck.IsRequeue = false;
+		roleCheck.GroupFinderActivityID = 0;
+		byte dungeonCount = packet.ReadUInt8();
+		for (byte i = 0; i < dungeonCount; i++)
+		{
+			roleCheck.JoinSlots.Add(packet.ReadUInt32());
+		}
+		byte memberCount = packet.ReadUInt8();
+		for (byte i = 0; i < memberCount; i++)
+		{
+			LfgRoleCheckMember member = new LfgRoleCheckMember();
+			member.Guid = packet.ReadGuid().To128(this.GetSession().GameState);
+			bool ready = packet.ReadBool();
+			member.RolesDesired = packet.ReadUInt32();
+			member.Level = packet.ReadUInt8();
+			member.RoleCheckComplete = ready;
+			roleCheck.Members.Add(member);
+		}
+		this.SendPacketToClient(roleCheck);
+	}
+
+	[PacketHandler(Opcode.SMSG_LFG_PARTY_INFO)]
+	private void HandleLfgPartyInfo(WorldPacket packet)
+	{
+		LfgPartyInfo partyInfo = new LfgPartyInfo();
+		byte playerCount = packet.ReadUInt8();
+		for (byte i = 0; i < playerCount; i++)
+		{
+			LfgBlackListEntry entry = new LfgBlackListEntry();
+			entry.PlayerGuid = packet.ReadGuid().To128(this.GetSession().GameState);
+			uint lockCount = packet.ReadUInt32();
+			for (uint j = 0; j < lockCount; j++)
+			{
+				LfgLockInfoData lockInfo = new LfgLockInfoData();
+				lockInfo.Slot = packet.ReadUInt32(); // dungeonId
+				lockInfo.LockStatus = packet.ReadUInt32(); // lockStatus
+				lockInfo.SubReason1 = 0;
+				lockInfo.SubReason2 = 0;
+				entry.Locks.Add(lockInfo);
+			}
+			partyInfo.Players.Add(entry);
+		}
+		this.SendPacketToClient(partyInfo);
+	}
+
+	[PacketHandler(Opcode.SMSG_BATTLEFIELD_STATUS_QUEUED)]
+	private void HandleBattlefieldStatusQueued(WorldPacket packet)
+	{
+		// Legacy sends unified SMSG_BATTLEFIELD_STATUS with StatusID field
+		uint queueSlot = packet.ReadUInt32();
+		byte arenaType = packet.ReadUInt8();
+		packet.ReadUInt8(); // isRatedArena flag
+		uint bgTypeId = packet.ReadUInt32();
+		packet.ReadUInt16(); // unk
+		byte minLevel = packet.ReadUInt8();
+		byte maxLevel = packet.ReadUInt8();
+		uint clientInstanceId = packet.ReadUInt32();
+		packet.ReadUInt8(); // isRated
+		uint statusId = packet.ReadUInt32();
+
+		if (statusId == 1) // STATUS_WAIT_QUEUE
+		{
+			uint avgWaitTime = packet.ReadUInt32();
+			uint waitTime = packet.ReadUInt32();
+
+			BattlefieldStatusQueued queued = new BattlefieldStatusQueued();
+			queued.Hdr.Ticket.RequesterGuid = this.GetSession().GameState.CurrentPlayerGuid;
+			queued.Hdr.Ticket.Id = queueSlot;
+			queued.Hdr.Ticket.Type = RideType.Battlegrounds;
+			queued.Hdr.Ticket.Time = (long)System.DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+			queued.Hdr.BattlefieldListIDs.Add(bgTypeId);
+			queued.Hdr.RangeMin = minLevel;
+			queued.Hdr.RangeMax = maxLevel;
+			queued.Hdr.ArenaTeamSize = arenaType;
+			queued.Hdr.InstanceID = clientInstanceId;
+			queued.AverageWaitTime = avgWaitTime;
+			queued.WaitTime = waitTime;
+			queued.AsGroup = false;
+			queued.EligibleForMatchmaking = true;
+			queued.SuspendedQueue = false;
+			this.SendPacketToClient(queued);
+		}
 	}
 
 	[PacketHandler(Opcode.SMSG_ATTACKER_STATE_UPDATE)]
@@ -2110,6 +2465,23 @@ public class WorldClient
 	[PacketHandler(Opcode.SMSG_ATTACKSWING_NOTINRANGE)]
 	private void HandleAttackSwingNotInRange(WorldPacket packet)
 	{
+		// Don't forward "not in range" if player has a ranged weapon equipped
+		// The modern client needs to stay in attack state to initiate Auto Shot
+		if (this.GetSession().GameState.CurrentPlayerGuid != null)
+		{
+			var visibleItems = this.GetSession().GameState.GetCachedObjectFieldsLegacy(this.GetSession().GameState.CurrentPlayerGuid);
+			int PLAYER_VISIBLE_ITEM_1_ENTRYID = LegacyVersion.GetUpdateField(PlayerField.PLAYER_VISIBLE_ITEM_1_ENTRYID);
+			if (PLAYER_VISIBLE_ITEM_1_ENTRYID >= 0)
+			{
+				int offset = LegacyVersion.AddedInVersion(ClientVersionBuild.V3_0_2_9056) ? 2 : (LegacyVersion.AddedInVersion(ClientVersionBuild.V2_0_1_6180) ? 16 : 12);
+				int rangedIdx = PLAYER_VISIBLE_ITEM_1_ENTRYID + 17 * offset;
+				if (visibleItems != null && visibleItems.ContainsKey(rangedIdx) && visibleItems[rangedIdx].UInt32Value != 0)
+				{
+					Log.Print(LogType.Debug, "[Combat] Suppressing ATTACKSWING_NOTINRANGE - player has ranged weapon equipped", "HandleAttackSwingNotInRange", "");
+					return;
+				}
+			}
+		}
 		AttackSwingError attack = new AttackSwingError();
 		attack.Reason = AttackSwingErr.NotInRange;
 		this.SendPacketToClient(attack);
@@ -7614,6 +7986,7 @@ public class WorldClient
 			SendSpellHistory histories = new SendSpellHistory();
 			for (ushort i2 = 0; i2 < cooldownCount; i2++)
 			{
+				if (!packet.CanRead()) break;
 				SpellHistoryEntry history = new SpellHistoryEntry();
 				uint spellId2 = ((!LegacyVersion.AddedInVersion(ClientVersionBuild.V3_1_0_9767)) ? packet.ReadUInt16() : packet.ReadUInt32());
 				history.SpellID = spellId2;
@@ -7837,6 +8210,12 @@ public class WorldClient
 			this.GetSession().InstanceSocket.SendCastRequestFailed(pending, isPet: true);
 		}
 		this.GetSession().GameState.PendingClientPetCasts.Clear();
+	}
+
+	[PacketHandler(Opcode.SMSG_SPELL_FAILURE)]
+	private void HandleSpellFailure(WorldPacket packet)
+	{
+		// Consumed — SpellFailure is generated from SMSG_SPELL_FAILED_OTHER handler
 	}
 
 	[PacketHandler(Opcode.SMSG_SPELL_FAILED_OTHER)]
@@ -8652,7 +9031,7 @@ public class WorldClient
 			this.ReadSingleAura(packet, guid, update);
 			if (update.Auras.Count > 0)
 			{
-				this.SendPacketToClient(update);
+					this.SendPacketToClient(update);
 			}
 		}
 	}
@@ -9300,7 +9679,12 @@ public class WorldClient
 				}
 				WowGuid128 guid = oldGuid.To128(this.GetSession().GameState);
 				this.PrintString("Guid = " + guid.ToString(), i);
-				ObjectUpdate updateData = new ObjectUpdate(guid, UpdateTypeModern.CreateObject2, this.GetSession());
+				// In 3.4.3, CreateObject2 is ONLY for the self-player.
+				// Legacy 3.3.5a uses CreateObject2 for all nearby objects, so downgrade non-self objects to CreateObject1.
+				UpdateTypeModern createType = (guid == this.GetSession().GameState.CurrentPlayerGuid)
+					? UpdateTypeModern.CreateObject2
+					: UpdateTypeModern.CreateObject1;
+				ObjectUpdate updateData = new ObjectUpdate(guid, createType, this.GetSession());
 				AuraUpdate auraUpdate = new AuraUpdate(guid, all: true);
 				this.ReadCreateObjectBlock(packet, guid, updateData, auraUpdate, i);
 				if (guid.IsItem() && updateData.ObjectData.EntryID.HasValue && !GameData.ItemTemplates.ContainsKey((uint)updateData.ObjectData.EntryID.Value))
@@ -10801,6 +11185,7 @@ public class WorldClient
 			if (UNIT_FIELD_RANGEDATTACKTIME >= 0 && updateMaskArray[UNIT_FIELD_RANGEDATTACKTIME])
 			{
 				updateData.UnitData.RangedAttackRoundBaseTime = updates[UNIT_FIELD_RANGEDATTACKTIME].UInt32Value;
+				Log.Print(LogType.Debug, $"[UnitField] RangedAttackRoundBaseTime = {updates[UNIT_FIELD_RANGEDATTACKTIME].UInt32Value}", "HandleUpdateObject", "");
 			}
 			int UNIT_FIELD_BOUNDINGRADIUS = LegacyVersion.GetUpdateField(UnitField.UNIT_FIELD_BOUNDINGRADIUS);
 			if (UNIT_FIELD_BOUNDINGRADIUS >= 0 && updateMaskArray[UNIT_FIELD_BOUNDINGRADIUS])
@@ -11269,6 +11654,8 @@ public class WorldClient
 					{
 						updateData.PlayerData.VisibleItems[i20] = new VisibleItem();
 						updateData.PlayerData.VisibleItems[i20].ItemID = updates[PLAYER_VISIBLE_ITEM_1_ENTRYID + i20 * offset2].Int32Value;
+						if (i20 >= 15 && i20 <= 18)
+							Log.Print(LogType.Debug, $"[VisibleItem] Slot {i20} ItemID={updateData.PlayerData.VisibleItems[i20].ItemID}", "HandleUpdateObject", "");
 					}
 				}
 			}
@@ -11280,6 +11667,8 @@ public class WorldClient
 					if (updateMaskArray[PLAYER_FIELD_INV_SLOT_HEAD + i21 * 2])
 					{
 						updateData.ActivePlayerData.InvSlots[i21] = WorldClient.GetGuidValue(updates, PLAYER_FIELD_INV_SLOT_HEAD + i21 * 2).To128(this.GetSession().GameState);
+						if (i21 >= 15 && i21 <= 18)
+							Log.Print(LogType.Debug, $"[InvSlot] Slot {i21} = {updateData.ActivePlayerData.InvSlots[i21]}", "HandleUpdateObject", "");
 					}
 				}
 			}

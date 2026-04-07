@@ -56,6 +56,8 @@ internal class SpellNonMeleeDamageLog : ServerPacket
 		base._worldPacket.WriteInt32(this.Absorbed);
 		base._worldPacket.WriteInt32(this.Resisted);
 		base._worldPacket.WriteInt32(this.ShieldBlock);
+		base._worldPacket.WriteUInt32(0); // WorldTextViewers count
+		base._worldPacket.WriteUInt32(0); // Supporters count
 		base._worldPacket.WriteBit(this.Periodic);
 		base._worldPacket.WriteBits((uint)this.Flags, 7);
 		base._worldPacket.WriteBit(bit: false);

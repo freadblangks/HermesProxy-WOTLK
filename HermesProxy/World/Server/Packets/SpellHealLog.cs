@@ -43,6 +43,7 @@ internal class SpellHealLog : ServerPacket
 		base._worldPacket.WriteInt32(this.OriginalHealAmount);
 		base._worldPacket.WriteUInt32(this.OverHeal);
 		base._worldPacket.WriteUInt32(this.Absorbed);
+		base._worldPacket.WriteUInt32(0); // Supporters count
 		base._worldPacket.WriteBit(this.Crit);
 		base._worldPacket.WriteBit(this.CritRollMade.HasValue);
 		base._worldPacket.WriteBit(this.CritRollNeeded.HasValue);

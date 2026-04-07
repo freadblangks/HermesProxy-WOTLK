@@ -26,9 +26,6 @@ internal class PlayObjectSound : ServerPacket
 		base._worldPacket.WritePackedGuid128(this.SourceObjectGUID);
 		base._worldPacket.WritePackedGuid128(this.TargetObjectGUID);
 		base._worldPacket.WriteVector3(this.Position);
-		if (ModernVersion.AddedInVersion(9, 0, 1, 1, 14, 0, 2, 5, 1))
-		{
-			base._worldPacket.WriteInt32(this.BroadcastTextID);
-		}
+		base._worldPacket.WriteInt32(this.BroadcastTextID);
 	}
 }

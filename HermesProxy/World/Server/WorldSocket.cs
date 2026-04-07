@@ -559,6 +559,36 @@ public class WorldSocket : SocketBase, BnetServices.INetwork
 		this.SendPacket(result);
 	}
 
+	[PacketHandler(Opcode.CMSG_ALTER_APPEARANCE)]
+	private void HandleAlterAppearance(AlterAppearance alter)
+	{
+		CharacterCustomizations.ConvertModernCustomizationsToLegacy(alter.Customizations, out var skin, out var face, out var hairStyle, out var hairColor, out var facialhair);
+		WorldPacket packet = new WorldPacket(Opcode.CMSG_ALTER_APPEARANCE);
+		packet.WriteUInt32(hairStyle);
+		packet.WriteUInt32(hairColor);
+		packet.WriteUInt32(facialhair);
+		packet.WriteUInt32(skin);
+		this.SendPacketToServer(packet);
+	}
+
+	[PacketHandler(Opcode.CMSG_UPDATE_MISSILE_TRAJECTORY)]
+	private void HandleUpdateMissileTrajectory(UpdateMissileTrajectory missile)
+	{
+		WorldPacket packet = new WorldPacket(Opcode.CMSG_UPDATE_MISSILE_TRAJECTORY);
+		packet.WriteGuid(missile.Guid.To64());
+		packet.WriteUInt32((uint)missile.SpellID);
+		packet.WriteFloat(missile.Pitch);
+		packet.WriteFloat(missile.Speed);
+		packet.WriteFloat(missile.FirePosX);
+		packet.WriteFloat(missile.FirePosY);
+		packet.WriteFloat(missile.FirePosZ);
+		packet.WriteFloat(missile.ImpactPosX);
+		packet.WriteFloat(missile.ImpactPosY);
+		packet.WriteFloat(missile.ImpactPosZ);
+		packet.WriteUInt8(0); // moveStop
+		this.SendPacketToServer(packet);
+	}
+
 	[PacketHandler(Opcode.CMSG_CREATE_CHARACTER)]
 	private void HandleCreateCharacter(CreateCharacter charCreate)
 	{
@@ -836,6 +866,32 @@ public class WorldSocket : SocketBase, BnetServices.INetwork
 		}
 	}
 
+	[PacketHandler(Opcode.CMSG_CHAT_CHANNEL_BAN)]
+	[PacketHandler(Opcode.CMSG_CHAT_CHANNEL_INVITE)]
+	[PacketHandler(Opcode.CMSG_CHAT_CHANNEL_KICK)]
+	[PacketHandler(Opcode.CMSG_CHAT_CHANNEL_MODERATOR)]
+	[PacketHandler(Opcode.CMSG_CHAT_CHANNEL_SET_OWNER)]
+	[PacketHandler(Opcode.CMSG_CHAT_CHANNEL_SILENCE_ALL)]
+	[PacketHandler(Opcode.CMSG_CHAT_CHANNEL_UNBAN)]
+	[PacketHandler(Opcode.CMSG_CHAT_CHANNEL_UNMODERATOR)]
+	[PacketHandler(Opcode.CMSG_CHAT_CHANNEL_UNSILENCE_ALL)]
+	private void HandleChatChannelPlayerCommand(ChannelPlayerCommand command)
+	{
+		WorldPacket packet = new WorldPacket(command.GetUniversalOpcode());
+		packet.WriteCString(command.ChannelName);
+		packet.WriteCString(command.Name);
+		this.SendPacketToServer(packet);
+	}
+
+	[PacketHandler(Opcode.CMSG_CHAT_CHANNEL_PASSWORD)]
+	private void HandleChatChannelPassword(ChannelPassword command)
+	{
+		WorldPacket packet = new WorldPacket(Opcode.CMSG_CHAT_CHANNEL_PASSWORD);
+		packet.WriteCString(command.ChannelName);
+		packet.WriteCString(command.Password);
+		this.SendPacketToServer(packet);
+	}
+
 	[PacketHandler(Opcode.CMSG_CHAT_MESSAGE_AFK)]
 	private void HandleChatMessageAFK(ChatMessageAFK afk)
 	{
@@ -1101,6 +1157,20 @@ public class WorldSocket : SocketBase, BnetServices.INetwork
 		WorldPacket packet = new WorldPacket(Opcode.CMSG_ATTACK_SWING);
 		packet.WriteGuid(attack.Victim.To64());
 		this.SendPacketToServer(packet);
+
+		// Modern client doesn't send CMSG_CAST_SPELL for Auto Shot like the old client did.
+		// If player has a ranged weapon equipped, auto-cast Auto Shot (spell 75) for them.
+		if (this.GetSession().GameState.HasRangedWeapon())
+		{
+			WorldPacket castPacket = new WorldPacket(Opcode.CMSG_CAST_SPELL);
+			castPacket.WriteUInt8(0); // cast count
+			castPacket.WriteUInt32(75); // Auto Shot spell ID
+			castPacket.WriteUInt8(0); // cast flags
+			// Target flags: unit target
+			castPacket.WriteUInt32(2); // TARGET_FLAG_UNIT
+			castPacket.WritePackedGuid(attack.Victim.To64());
+			this.SendPacketToServer(castPacket);
+		}
 	}
 
 	[PacketHandler(Opcode.CMSG_ATTACK_STOP)]
@@ -2053,6 +2123,26 @@ public class WorldSocket : SocketBase, BnetServices.INetwork
 		this.SendPacketToServer(packet);
 	}
 
+	[PacketHandler(Opcode.CMSG_SPELL_CLICK)]
+	private void HandleSpellClick(SpellClick click)
+	{
+		WorldPacket packet = new WorldPacket(Opcode.CMSG_SPELL_CLICK);
+		packet.WriteGuid(click.SpellClickUnitGuid.To64());
+		this.SendPacketToServer(packet);
+	}
+
+	[PacketHandler(Opcode.CMSG_AUTO_STORE_BAG_ITEM)]
+	private void HandleAutoStoreBagItem(AutoStoreBagItem item)
+	{
+		WorldPacket packet = new WorldPacket(Opcode.CMSG_AUTO_STORE_BAG_ITEM);
+		byte srcBag = ((item.ContainerSlotA != byte.MaxValue) ? ModernVersion.AdjustInventorySlot(item.ContainerSlotA) : item.ContainerSlotA);
+		packet.WriteUInt8(srcBag);
+		packet.WriteUInt8(item.SlotA);
+		byte dstBag = ((item.ContainerSlotB != byte.MaxValue) ? ModernVersion.AdjustInventorySlot(item.ContainerSlotB) : item.ContainerSlotB);
+		packet.WriteUInt8(dstBag);
+		this.SendPacketToServer(packet);
+	}
+
 	[PacketHandler(Opcode.CMSG_AUTO_EQUIP_ITEM)]
 	[PacketHandler(Opcode.CMSG_AUTOSTORE_BANK_ITEM)]
 	[PacketHandler(Opcode.CMSG_AUTOBANK_ITEM)]
@@ -2084,6 +2174,35 @@ public class WorldSocket : SocketBase, BnetServices.INetwork
 		byte slot = ((item.PackSlot == byte.MaxValue) ? ModernVersion.AdjustInventorySlot(item.Slot) : item.Slot);
 		packet.WriteUInt8(containerSlot);
 		packet.WriteUInt8(slot);
+		this.SendPacketToServer(packet);
+	}
+
+	[PacketHandler(Opcode.CMSG_REMOVE_GLYPH)]
+	private void HandleRemoveGlyph(RemoveGlyph glyph)
+	{
+		WorldPacket packet = new WorldPacket(Opcode.CMSG_REMOVE_GLYPH);
+		packet.WriteUInt32((uint)glyph.GlyphSlot);
+		this.SendPacketToServer(packet);
+	}
+
+	[PacketHandler(Opcode.CMSG_INSTANCE_LOCK_RESPONSE)]
+	private void HandleInstanceLockResponse(InstanceLockResponse lockResponse)
+	{
+		WorldPacket packet = new WorldPacket(Opcode.CMSG_INSTANCE_LOCK_RESPONSE);
+		packet.WriteUInt8(lockResponse.AcceptLock ? (byte)1 : (byte)0);
+		this.SendPacketToServer(packet);
+	}
+
+	[PacketHandler(Opcode.CMSG_QUEST_POI_QUERY)]
+	private void HandleQuestPOIQuery(QuestPOIQuery query)
+	{
+		WorldPacket packet = new WorldPacket(Opcode.CMSG_QUEST_POI_QUERY);
+		int count = System.Math.Min(query.MissingQuestCount, 25);
+		packet.WriteUInt32((uint)count);
+		for (int i = 0; i < count; i++)
+		{
+			packet.WriteUInt32((uint)query.MissingQuestPOIs[i]);
+		}
 		this.SendPacketToServer(packet);
 	}
 
@@ -3045,6 +3164,62 @@ public class WorldSocket : SocketBase, BnetServices.INetwork
 		}
 		packet.WriteUInt32(movement.TimeSkipped);
 		this.SendPacketToServer(packet);
+	}
+
+	[PacketHandler(Opcode.CMSG_REQUEST_VEHICLE_EXIT)]
+	[PacketHandler(Opcode.CMSG_REQUEST_VEHICLE_PREV_SEAT)]
+	[PacketHandler(Opcode.CMSG_REQUEST_VEHICLE_NEXT_SEAT)]
+	private void HandleRequestVehicleAction(EmptyClientPacket packet)
+	{
+		WorldPacket legacyPacket = new WorldPacket(packet.GetUniversalOpcode());
+		this.SendPacketToServer(legacyPacket);
+	}
+
+	[PacketHandler(Opcode.CMSG_REQUEST_VEHICLE_SWITCH_SEAT)]
+	private void HandleRequestVehicleSwitchSeat(RequestVehicleSwitchSeat switchSeat)
+	{
+		WorldPacket packet = new WorldPacket(Opcode.CMSG_REQUEST_VEHICLE_SWITCH_SEAT);
+		packet.WritePackedGuid(switchSeat.Vehicle.To64());
+		packet.WriteUInt8(switchSeat.SeatIndex);
+		this.SendPacketToServer(packet);
+	}
+
+	[PacketHandler(Opcode.CMSG_GM_TICKET_GET_CASE_STATUS)]
+	private void HandleGMTicketGetCaseStatus(EmptyClientPacket packet)
+	{
+		GMTicketCaseStatus response = new GMTicketCaseStatus();
+		this.SendPacket(response);
+	}
+
+	[PacketHandler(Opcode.CMSG_CANCEL_GROWTH_AURA)]
+	[PacketHandler(Opcode.CMSG_HEARTH_AND_RESURRECT)]
+	[PacketHandler(Opcode.CMSG_STABLE_REVIVE_PET)]
+	[PacketHandler(Opcode.CMSG_QUERY_QUESTS_COMPLETED)]
+	[PacketHandler(Opcode.CMSG_GM_TICKET_DELETE_TICKET)]
+	[PacketHandler(Opcode.CMSG_GM_TICKET_GET_TICKET)]
+	[PacketHandler(Opcode.CMSG_GM_TICKET_GET_SYSTEM_STATUS)]
+	private void HandleSimpleEmptyPacket(EmptyClientPacket packet)
+	{
+		WorldPacket legacyPacket = new WorldPacket(packet.GetUniversalOpcode());
+		this.SendPacketToServer(legacyPacket);
+	}
+
+	[PacketHandler(Opcode.CMSG_ZONEUPDATE)]
+	private void HandleZoneUpdate(WorldPacket packet)
+	{
+		uint zoneId = packet.ReadUInt32();
+		WorldPacket legacyPacket = new WorldPacket(Opcode.CMSG_ZONEUPDATE);
+		legacyPacket.WriteUInt32(zoneId);
+		this.SendPacketToServer(legacyPacket);
+	}
+
+	[PacketHandler(Opcode.CMSG_GM_TICKET_UPDATE_TEXT)]
+	private void HandleGMTicketUpdateText(WorldPacket packet)
+	{
+		string message = packet.ReadCString();
+		WorldPacket legacyPacket = new WorldPacket(Opcode.CMSG_GM_TICKET_UPDATE_TEXT);
+		legacyPacket.WriteCString(message);
+		this.SendPacketToServer(legacyPacket);
 	}
 
 	[PacketHandler(Opcode.CMSG_BANKER_ACTIVATE)]
