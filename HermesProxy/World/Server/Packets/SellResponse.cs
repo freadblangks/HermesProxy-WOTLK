@@ -18,7 +18,8 @@ public class SellResponse : ServerPacket
 	public override void Write()
 	{
 		base._worldPacket.WritePackedGuid128(this.VendorGUID);
+		base._worldPacket.WriteUInt32(1); // ItemGUIDs count
+		base._worldPacket.WriteInt32((int)this.Reason);
 		base._worldPacket.WritePackedGuid128(this.ItemGUID);
-		base._worldPacket.WriteUInt8(this.Reason);
 	}
 }

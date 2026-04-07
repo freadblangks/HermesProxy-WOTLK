@@ -1973,9 +1973,12 @@ public class WorldSocket : SocketBase, BnetServices.INetwork
 	[PacketHandler(Opcode.CMSG_SELL_ITEM)]
 	private void HandleSellItem(SellItem item)
 	{
+		WowGuid64 vendorGuid64 = item.VendorGUID.To64();
+		WowGuid64 itemGuid64 = item.ItemGUID.To64();
+		Log.Print(LogType.Debug, $"[SellItem] Item128={item.ItemGUID} → Item64={itemGuid64} Vendor128={item.VendorGUID} → Vendor64={vendorGuid64}", "HandleSellItem", "");
 		WorldPacket packet = new WorldPacket(Opcode.CMSG_SELL_ITEM);
-		packet.WriteGuid(item.VendorGUID.To64());
-		packet.WriteGuid(item.ItemGUID.To64());
+		packet.WriteGuid(vendorGuid64);
+		packet.WriteGuid(itemGuid64);
 		if (LegacyVersion.AddedInVersion(ClientVersionBuild.V3_2_0_10192))
 		{
 			packet.WriteUInt32(item.Amount);

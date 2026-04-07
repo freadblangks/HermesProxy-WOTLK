@@ -1081,7 +1081,7 @@ public class WorldClient
 		// Teleports don't send a new player CreateObject so _playerObjectSent would never become true
 		if (!this.GetSession().GameState.IsInWorld)
 		{
-			UpdateObject.ResetLoginBuffer();
+			UpdateObject.ResetLoginBuffer(this.GetSession().GameState);
 		}
 		LoginVerifyWorld verify = new LoginVerifyWorld();
 		verify.MapID = packet.ReadUInt32();
@@ -4218,6 +4218,7 @@ public class WorldClient
 		sell.VendorGUID = packet.ReadGuid().To128(this.GetSession().GameState);
 		sell.ItemGUID = packet.ReadGuid().To128(this.GetSession().GameState);
 		sell.Reason = packet.ReadUInt8();
+		Log.Print(LogType.Debug, $"[SellResponse] Item={sell.ItemGUID} Vendor={sell.VendorGUID} Reason={sell.Reason}", "HandleSellResponse", "");
 		this.SendPacketToClient(sell);
 	}
 

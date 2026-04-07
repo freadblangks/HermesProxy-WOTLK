@@ -39,6 +39,11 @@ public class GameSessionData
 
 	public bool IsInWorld;
 
+	// Login update buffering (moved from UpdateObject [ThreadStatic] to fix thread-switching issues)
+	public bool PlayerObjectSent;
+	public List<ObjectUpdate> PendingLoginUpdates;
+	public List<WowGuid128> PendingLoginDestroys;
+
 	public uint? CurrentMapId;
 
 	// Cached QueryGameObjectResponse data for pre-sending before transport CreateObjects

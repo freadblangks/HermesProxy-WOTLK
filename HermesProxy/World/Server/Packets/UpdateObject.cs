@@ -15,17 +15,6 @@ namespace HermesProxy.World.Server.Packets;
 
 public class UpdateObject : ServerPacket
 {
-	[ThreadStatic]
-	private static List<ObjectUpdate> _pendingLoginUpdates;
-
-	[ThreadStatic]
-	private static List<WowGuid128> _pendingLoginDestroys;
-
-	[ThreadStatic]
-	private static bool _playerObjectSent;
-
-	public static bool IsPlayerObjectSent => _playerObjectSent;
-
 	private GameSessionData _gameState;
 
 	public uint NumObjUpdates;
@@ -46,24 +35,24 @@ public class UpdateObject : ServerPacket
 		this._gameState = gameState;
 	}
 
-	public static void ResetLoginBuffer()
+	public static void ResetLoginBuffer(GameSessionData gameState)
 	{
-		UpdateObject._pendingLoginUpdates = new List<ObjectUpdate>();
-		UpdateObject._pendingLoginDestroys = new List<WowGuid128>();
-		UpdateObject._playerObjectSent = false;
+		gameState.PendingLoginUpdates = new List<ObjectUpdate>();
+		gameState.PendingLoginDestroys = new List<WowGuid128>();
+		gameState.PlayerObjectSent = false;
 	}
 
 	public override void Write()
 	{
-		if (ModernVersion.ExpansionVersion >= 3 && !UpdateObject._playerObjectSent)
+		if (ModernVersion.ExpansionVersion >= 3 && !this._gameState.PlayerObjectSent)
 		{
 			Log.Print(LogType.Debug, $"[UpdateObject] _playerObjectSent=false, checking for player in {this.ObjectUpdates.Count} updates", "Write", "");
 		}
-		if (ModernVersion.ExpansionVersion >= 3 && !UpdateObject._playerObjectSent)
+		if (ModernVersion.ExpansionVersion >= 3 && !this._gameState.PlayerObjectSent)
 		{
-			if (UpdateObject._pendingLoginUpdates == null)
+			if (this._gameState.PendingLoginUpdates == null)
 			{
-				UpdateObject.ResetLoginBuffer();
+				ResetLoginBuffer(this._gameState);
 			}
 			bool hasPlayer = false;
 			foreach (ObjectUpdate update in this.ObjectUpdates)
@@ -76,20 +65,20 @@ public class UpdateObject : ServerPacket
 			}
 			if (!hasPlayer && this.ObjectUpdates.Count > 0)
 			{
-				UpdateObject._pendingLoginUpdates.AddRange(this.ObjectUpdates);
-				UpdateObject._pendingLoginDestroys.AddRange(this.DestroyedGuids);
-				Log.Print(LogType.Debug, $"[UpdateObject] Buffering {this.ObjectUpdates.Count} updates (total: {UpdateObject._pendingLoginUpdates.Count})", "Write", "F:\\Ampps\\HermesProxy-master\\HermesProxy\\World\\Server\\Packets\\UpdatePackets.cs");
+				this._gameState.PendingLoginUpdates.AddRange(this.ObjectUpdates);
+				this._gameState.PendingLoginDestroys.AddRange(this.DestroyedGuids);
+				Log.Print(LogType.Debug, $"[UpdateObject] Buffering {this.ObjectUpdates.Count} updates (total: {this._gameState.PendingLoginUpdates.Count})", "Write", "F:\\Ampps\\HermesProxy-master\\HermesProxy\\World\\Server\\Packets\\UpdatePackets.cs");
 				base.SkipSend = true;
 				return;
 			}
 			if (hasPlayer)
 			{
-				List<ObjectUpdate> merged = new List<ObjectUpdate>(UpdateObject._pendingLoginUpdates);
+				List<ObjectUpdate> merged = new List<ObjectUpdate>(this._gameState.PendingLoginUpdates);
 				merged.AddRange(this.ObjectUpdates);
 				this.ObjectUpdates = merged;
-				this.DestroyedGuids.AddRange(UpdateObject._pendingLoginDestroys);
-				UpdateObject._playerObjectSent = true;
-				Log.Print(LogType.Debug, $"[UpdateObject] Merged {UpdateObject._pendingLoginUpdates.Count} buffered + sending {this.ObjectUpdates.Count} total updates", "Write", "F:\\Ampps\\HermesProxy-master\\HermesProxy\\World\\Server\\Packets\\UpdatePackets.cs");
+				this.DestroyedGuids.AddRange(this._gameState.PendingLoginDestroys);
+				this._gameState.PlayerObjectSent = true;
+				Log.Print(LogType.Debug, $"[UpdateObject] Merged {this._gameState.PendingLoginUpdates.Count} buffered + sending {this.ObjectUpdates.Count} total updates", "Write", "F:\\Ampps\\HermesProxy-master\\HermesProxy\\World\\Server\\Packets\\UpdatePackets.cs");
 			}
 		}
 		this.MapID = (ushort)this._gameState.CurrentMapId.Value;
