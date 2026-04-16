@@ -414,6 +414,16 @@ public static class GameData
 		return 0u;
 	}
 
+	public static uint GetSpellIdFromVisual(uint visualId)
+	{
+		foreach (var kvp in GameData.SpellVisuals)
+		{
+			if (kvp.Value == visualId)
+				return kvp.Key;
+		}
+		return 0u;
+	}
+
 	public static int GetTotemSlotForSpell(uint spellId)
 	{
 		if (GameData.TotemSpells.TryGetValue(spellId, out var slot))

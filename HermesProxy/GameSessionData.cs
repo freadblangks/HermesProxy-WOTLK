@@ -110,6 +110,14 @@ public class GameSessionData
 
 	public WowGuid128 CurrentInteractedWithGO;
 
+	public uint PendingGatheringSpellId;
+
+	public uint CurrentChanneledSpellId;
+
+	public WowGuid128 CurrentChanneledCastId;
+
+	public uint CurrentChanneledSpellVisualId;
+
 	public uint LastWhoRequestId;
 
 	public WowGuid128 CurrentPetGuid;

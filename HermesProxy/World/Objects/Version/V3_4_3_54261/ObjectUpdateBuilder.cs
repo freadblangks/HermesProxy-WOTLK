@@ -30,6 +30,20 @@ public class ObjectUpdateBuilder
 
 	private bool IsOwner => this.m_realObjectType == ObjectTypeBCC.ActivePlayer || this.m_realObjectType == ObjectTypeBCC.Item || this.m_realObjectType == ObjectTypeBCC.Container;
 
+	private bool IsGameObjectOwner
+	{
+		get
+		{
+			if (this.m_realObjectType != ObjectTypeBCC.GameObject)
+				return false;
+			var createdBy = this.m_updateData.GameObjectData?.CreatedBy;
+			var playerGuid = this.m_gameState.CurrentPlayerGuid;
+			if (createdBy != null && playerGuid != null)
+				return createdBy.GetCounter() == playerGuid.GetCounter() && createdBy.GetHighType() == playerGuid.GetHighType();
+			return false;
+		}
+	}
+
 	public ObjectUpdateBuilder(ObjectUpdate updateData, GameSessionData gameState)
 	{
 		this.m_updateData = updateData;
@@ -217,7 +231,7 @@ public class ObjectUpdateBuilder
 		}
 		// Owner=0x01, PartyMember=0x02 (needed for QuestLog visibility)
 		byte updateFieldFlags = (byte)(this.IsOwner ? 0x03 : 0);
-		Log.Print(LogType.Debug, $"[ValuesCreate] type={this.m_objectType} flags=0x{updateFieldFlags:X2} IsOwner={this.IsOwner}", "WriteValuesCreate", "F:\\Ampps\\HermesProxy-master\\HermesProxy\\World\\Objects\\Version\\V3_4_3_54261\\ObjectUpdateBuilder.cs");
+		Log.Print(LogType.Debug, $"[ValuesCreate] type={this.m_objectType} flags=0x{updateFieldFlags:X2} IsOwner={this.IsOwner}", "WriteValuesCreate", "");
 		data.WriteUInt8(updateFieldFlags);
 		int sectionStart = data.GetData().Length;
 		this.WriteCreateObjectData(data);
@@ -2269,10 +2283,15 @@ public class ObjectUpdateBuilder
 			}
 			if (unit.ChannelData != null)
 			{
-				data.WriteBits(7, 4);
+				bool hasChannelObject = unit.ChannelObject != null && !unit.ChannelObject.IsEmpty();
+				data.WriteBits(hasChannelObject ? 7 : 3, 4);
 				data.FlushBits();
 				data.WriteInt32(unit.ChannelData.SpellID);
 				data.WriteInt32(unit.ChannelData.SpellXSpellVisualID);
+				if (hasChannelObject)
+				{
+					data.WritePackedGuid128(unit.ChannelObject);
+				}
 			}
 			if (unit.RaceId.HasValue)
 			{
@@ -3035,6 +3054,10 @@ public class ObjectUpdateBuilder
 	private void WriteCreateGameObjectData(WorldPacket data)
 	{
 		GameObjectData go = this.m_updateData.GameObjectData ?? new GameObjectData();
+		if (this.m_updateData.ObjectData?.EntryID == 35591)
+		{
+			Log.Print(LogType.Debug, $"[BobberCreate] DisplayID={go.DisplayID} Flags=0x{go.Flags:X} State={go.State} TypeID={go.TypeID} ArtKit={go.ArtKit} PercentHealth={go.PercentHealth} CreatedBy={go.CreatedBy} Level={go.Level} DynFlags=0x{this.m_updateData.ObjectData?.DynamicFlags:X}", "WriteCreateGameObjectData", "");
+		}
 		data.WriteInt32(go.DisplayID.GetValueOrDefault());
 		data.WriteUInt32(go.SpellVisualID.GetValueOrDefault());
 		data.WriteUInt32(go.StateSpellVisualID.GetValueOrDefault());

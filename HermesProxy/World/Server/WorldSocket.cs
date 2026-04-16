@@ -1233,7 +1233,7 @@ public class WorldSocket : SocketBase, BnetServices.INetwork
 		WorldPacket usePacket = new WorldPacket(Opcode.CMSG_GAME_OBJ_USE);
 		usePacket.WriteGuid(guid64);
 		this.SendPacketToServer(usePacket);
-		// Also send GAME_OBJ_REPORT_USE (for achievement/stats tracking)
+		// Also send GAME_OBJ_REPORT_USE for tracking
 		WorldPacket reportPacket = new WorldPacket(Opcode.CMSG_GAME_OBJ_REPORT_USE);
 		reportPacket.WriteGuid(guid64);
 		this.SendPacketToServer(reportPacket);
@@ -4011,9 +4011,48 @@ public class WorldSocket : SocketBase, BnetServices.INetwork
 		}
 	}
 
+	// Mining proficiency spells → Opening spell (6478) — mining nodes are opened like chests
+	private static readonly HashSet<uint> _miningProficiencySpells = new HashSet<uint>
+	{
+		2575, 2576, 3564, 10248, 29354, 50310
+	};
+	// Herbalism proficiency spells → Opening spell (6478) — herb nodes are opened like chests
+	private static readonly HashSet<uint> _herbalismProficiencySpells = new HashSet<uint>
+	{
+		2366, 2368, 3570, 11993, 28695, 50300
+	};
+
 	[PacketHandler(Opcode.CMSG_CAST_SPELL)]
 	private void HandleCastSpell(CastSpell cast)
 	{
+		// Modern client sends gathering proficiency spells when clicking nodes.
+		// Translate to actual gathering spell. GO target will be injected from
+		// CurrentInteractedWithGO (set by previous CMSG_GAME_OBJ_REPORT_USE).
+		// Query fishing bobber template so the client knows it's a FISHINGNODE
+		if (cast.Cast.SpellID == 7620 || cast.Cast.SpellID == 7731 || cast.Cast.SpellID == 7732 ||
+			cast.Cast.SpellID == 18248 || cast.Cast.SpellID == 33095 || cast.Cast.SpellID == 51294)
+		{
+			if (!this.GetSession().GameState.GameObjectQueryCache.ContainsKey(35591))
+			{
+				WorldPacket goQuery = new WorldPacket(Opcode.CMSG_QUERY_GAME_OBJECT);
+				goQuery.WriteUInt32(35591);
+				goQuery.WriteUInt64(0);
+				this.SendPacketToServer(goQuery);
+			}
+		}
+		// Modern client sends gathering proficiency spells targeting nodes.
+		// Don't translate — these spells have SPELL_EFFECT_OPEN_LOCK and work as-is.
+		// Just inject the GO target if not already set.
+		if (_miningProficiencySpells.Contains(cast.Cast.SpellID) ||
+			_herbalismProficiencySpells.Contains(cast.Cast.SpellID))
+		{
+			Log.Print(LogType.Debug, $"[CastSpell] Gathering spell {cast.Cast.SpellID} — injecting GO target", "HandleCastSpell", "");
+			if ((cast.Cast.Target.Unit == null || cast.Cast.Target.Unit.IsEmpty()) && this.GetSession().GameState.CurrentInteractedWithGO != null && !this.GetSession().GameState.CurrentInteractedWithGO.IsEmpty())
+			{
+				cast.Cast.Target.Unit = this.GetSession().GameState.CurrentInteractedWithGO;
+				cast.Cast.Target.Flags |= SpellCastTargetFlags.GameObject;
+			}
+		}
 		if (Settings.ServerSpellDelay > 0)
 		{
 			Thread.Sleep(Settings.ServerSpellDelay);
@@ -4234,12 +4273,19 @@ public class WorldSocket : SocketBase, BnetServices.INetwork
 	[PacketHandler(Opcode.CMSG_CANCEL_CHANNELLING)]
 	private void HandleCancelChannelling(CancelChannelling cast)
 	{
+		// Modern 3.4.3 client sends CMSG_CANCEL_CHANNELLING for every ESC press.
+		// Use the stored channeled spell ID from CHANNEL_START when available.
+		uint spellId = this.GetSession().GameState.CurrentChanneledSpellId;
+		if (spellId == 0)
+			return;
+		Log.Print(LogType.Debug, $"[CancelChannel] Cancelling channeled spell {spellId}", "HandleCancelChannelling", "");
+		this.GetSession().GameState.CurrentChanneledSpellId = 0;
 		if (Settings.ServerSpellDelay > 0)
 		{
 			Thread.Sleep(Settings.ServerSpellDelay);
 		}
 		WorldPacket packet = new WorldPacket(Opcode.CMSG_CANCEL_CHANNELLING);
-		packet.WriteInt32(cast.SpellID);
+		packet.WriteInt32((int)spellId);
 		this.SendPacketToServer(packet);
 	}
 
@@ -5501,14 +5547,12 @@ public class WorldSocket : SocketBase, BnetServices.INetwork
 		this.GetSession().AccountDataMgr.LoadAllData(guid);
 		AccountDataTimes accountData = new AccountDataTimes();
 		accountData.PlayerGuid = guid;
-		accountData.ServerTime = (uint)Time.UnixTime;
+		accountData.ServerTime = Time.UnixTime;
 		int count = ModernVersion.GetAccountDataCount();
-		accountData.AccountTimes = new uint[32];
-		accountData.Mask = 0;
+		accountData.AccountTimes = new long[count];
 		for (int i = 0; i < count; i++)
 		{
-			accountData.Mask |= (1u << i);
-			accountData.AccountTimes[i] = (uint)((this.GetSession().AccountDataMgr.Data[i] != null) ? this.GetSession().AccountDataMgr.Data[i].Timestamp : 0);
+			accountData.AccountTimes[i] = ((this.GetSession().AccountDataMgr.Data[i] != null) ? this.GetSession().AccountDataMgr.Data[i].Timestamp : 0);
 		}
 		this.SendPacket(accountData);
 	}

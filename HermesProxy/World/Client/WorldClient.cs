@@ -7927,7 +7927,6 @@ public class WorldClient
 		{
 			InitializeFactions factions = new InitializeFactions();
 			uint count = packet.ReadUInt32();
-			factions.Count = count;
 			for (uint i = 0u; i < count; i++)
 			{
 				factions.FactionFlags[i] = (ReputationFlags)packet.ReadUInt8();
@@ -8429,6 +8428,14 @@ public class WorldClient
 			castId = this.GetSession().GameState.CurrentClientPetCast.ServerGUID;
 			spellVisual = this.GetSession().GameState.CurrentClientPetCast.SpellXSpellVisualId;
 		}
+		else if (casterUnit == this.GetSession().GameState.CurrentPlayerGuid && this.GetSession().GameState.CurrentChanneledSpellId == spellId && this.GetSession().GameState.CurrentChanneledCastId != null)
+		{
+			// Channeled spell failure (e.g. fishing cancel) — use stored cast info
+			castId = this.GetSession().GameState.CurrentChanneledCastId;
+			spellVisual = this.GetSession().GameState.CurrentChanneledSpellVisualId;
+			this.GetSession().GameState.CurrentChanneledSpellId = 0;
+			this.GetSession().GameState.CurrentChanneledCastId = null;
+		}
 		else
 		{
 			castId = WowGuid128.Create(HighGuidType703.Cast, SpellCastSource.Normal, this.GetSession().GameState.CurrentMapId.Value, spellId, spellId + casterUnit.GetCounter());
@@ -8521,6 +8528,9 @@ public class WorldClient
 		{
 			spell.Cast.CastID = this.GetSession().GameState.CurrentClientNormalCast.ServerGUID;
 			spell.Cast.SpellXSpellVisualID = this.GetSession().GameState.CurrentClientNormalCast.SpellXSpellVisualId;
+			// Save cast info for channeled spells — needed for cancel/failure after channel starts
+			this.GetSession().GameState.CurrentChanneledCastId = this.GetSession().GameState.CurrentClientNormalCast.ServerGUID;
+			this.GetSession().GameState.CurrentChanneledSpellVisualId = this.GetSession().GameState.CurrentClientNormalCast.SpellXSpellVisualId;
 			this.GetSession().GameState.CurrentClientNormalCast = null;
 		}
 		else if (this.GetSession().GameState.CurrentPlayerGuid == spell.Cast.CasterUnit && this.GetSession().GameState.CurrentClientSpecialCast != null && this.GetSession().GameState.CurrentClientSpecialCast.SpellId == spell.Cast.SpellID)
@@ -9001,6 +9011,11 @@ public class WorldClient
 		channel.SpellID = packet.ReadUInt32();
 		channel.SpellXSpellVisualID = GameData.GetSpellVisual(channel.SpellID);
 		channel.Duration = packet.ReadUInt32();
+		// Store channeled spell ID so cancel can use the real ID
+		if (channel.CasterGUID == this.GetSession().GameState.CurrentPlayerGuid)
+		{
+			this.GetSession().GameState.CurrentChanneledSpellId = (uint)channel.SpellID;
+		}
 		this.SendPacketToClient(channel);
 	}
 
@@ -9017,6 +9032,11 @@ public class WorldClient
 			channel.CasterGUID = this.GetSession().GameState.CurrentPlayerGuid;
 		}
 		channel.TimeRemaining = packet.ReadInt32();
+		if (channel.TimeRemaining == 0 && channel.CasterGUID == this.GetSession().GameState.CurrentPlayerGuid)
+		{
+			this.GetSession().GameState.CurrentChanneledSpellId = 0;
+			Log.Print(LogType.Debug, $"[ChannelUpdate] Channel ended (TimeRemaining=0)", "HandleSpellChannelUpdate", "");
+		}
 		this.SendPacketToClient(channel);
 	}
 
@@ -9606,16 +9626,14 @@ public class WorldClient
 		this.GetSession().GameState.ObjectCacheModern.Remove(guid);
 		this.GetSession().GameState.ObjectCacheMutex.ReleaseMutex();
 		this.GetSession().GameState.LastAuraCasterOnTarget.Remove(guid);
+		// Send both DestroyObject (for 3.4.3 GO cleanup) and UpdateObject (for compatibility)
 		if (ModernVersion.GetCurrentOpcode(Opcode.SMSG_DESTROY_OBJECT) != 0)
 		{
 			this.SendPacketToClient(new DestroyObject(guid));
 		}
-		else
-		{
-			UpdateObject updateObject = new UpdateObject(this.GetSession().GameState);
-			updateObject.DestroyedGuids.Add(guid);
-			this.SendPacketToClient(updateObject);
-		}
+		UpdateObject updateObject = new UpdateObject(this.GetSession().GameState);
+		updateObject.DestroyedGuids.Add(guid);
+		this.SendPacketToClient(updateObject);
 	}
 
 	[PacketHandler(Opcode.SMSG_COMPRESSED_UPDATE_OBJECT)]
@@ -11615,10 +11633,22 @@ public class WorldClient
 			int UNIT_CHANNEL_SPELL = LegacyVersion.GetUpdateField(UnitField.UNIT_CHANNEL_SPELL);
 			if (UNIT_CHANNEL_SPELL >= 0 && updateMaskArray[UNIT_CHANNEL_SPELL])
 			{
-				UnitChannel channel = new UnitChannel();
-				channel.SpellID = updates[UNIT_CHANNEL_SPELL].Int32Value;
-				channel.SpellXSpellVisualID = (int)GameData.GetSpellVisual((uint)channel.SpellID);
-				updateData.UnitData.ChannelData = channel;
+				int channelSpellId = updates[UNIT_CHANNEL_SPELL].Int32Value;
+				if (channelSpellId == 0)
+				{
+					this.GetSession().GameState.CurrentChanneledSpellId = 0;
+					// Don't write ChannelData with SpellID=0 — SMSG_SPELL_CHANNEL_UPDATE
+					// handles channel end. Writing it causes the 3.4.3 client to get stuck.
+				}
+				else
+				{
+					// Write ChannelData for active channels — the client needs ChannelObject
+					// (bobber GUID) to identify the fishing bobber for interaction.
+					UnitChannel channel = new UnitChannel();
+					channel.SpellID = channelSpellId;
+					channel.SpellXSpellVisualID = (int)GameData.GetSpellVisual((uint)channelSpellId);
+					updateData.UnitData.ChannelData = channel;
+				}
 			}
 			int UNIT_MOD_CAST_SPEED = LegacyVersion.GetUpdateField(UnitField.UNIT_MOD_CAST_SPEED);
 			if (UNIT_MOD_CAST_SPEED >= 0 && updateMaskArray[UNIT_MOD_CAST_SPEED])
@@ -12756,6 +12786,13 @@ public class WorldClient
 				GameObjectDynamicFlagsLegacy flags4 = (GameObjectDynamicFlagsLegacy)legacyDynFlags;
 				updateData.ObjectData.DynamicFlags = oldValue2 | (uint)flags4.CastFlags<GameObjectDynamicFlagsModern>();
 			}
+			// Fishing bobbers need Activate flag to be clickable in 3.4.3
+			if (updateData.ObjectData.EntryID == 35591)
+			{
+				uint dynVal = updateData.ObjectData.DynamicFlags.GetValueOrDefault(0xFFFF0000u);
+				dynVal |= (uint)GameObjectDynamicFlagsModern.Activate;
+				updateData.ObjectData.DynamicFlags = dynVal;
+			}
 			int GAMEOBJECT_FACTION = LegacyVersion.GetUpdateField(GameObjectField.GAMEOBJECT_FACTION);
 			if (GAMEOBJECT_FACTION >= 0 && updateMaskArray[GAMEOBJECT_FACTION])
 			{
@@ -12785,6 +12822,11 @@ public class WorldClient
 				updateData.GameObjectData.TypeID = (sbyte)((packed >> 8) & 0xFF);
 				updateData.GameObjectData.ArtKit = (byte)((packed >> 16) & 0xFF);
 				updateData.GameObjectData.PercentHealth = (byte)((packed >> 24) & 0xFF);
+			}
+			// Fishing bobbers: force State=0 (READY) so 3.4.3 client allows interaction
+			if (updateData.ObjectData.EntryID == 35591)
+			{
+				updateData.GameObjectData.State = 0;
 			}
 		}
 		if (objectType == ObjectType.DynamicObject)
@@ -13381,9 +13423,6 @@ public class WorldClient
 		case Opcode.SMSG_AUTH_RESPONSE:
 			this.HandleAuthResponse(packet);
 			break;
-		case Opcode.SMSG_SEND_KNOWN_SPELLS:
-			this.HandleInitialSpells(packet);
-			break;
 		default:
 			if (this._packetHandlers.ContainsKey(universalOpcode))
 			{
@@ -13405,7 +13444,6 @@ public class WorldClient
 			}
 			break;
 		case Opcode.SMSG_ADDON_INFO:
- 		this.SendPacketToClient(new AddonInfoPacket());
 			break;
 		}
 		this.SendDelayedPacketsToServerOnOpcode(universalOpcode);

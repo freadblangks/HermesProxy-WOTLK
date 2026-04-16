@@ -35,4 +35,6 @@ public class GameObjectData
 	public uint?[] StateWorldEffectIDs = new uint?[4];
 
 	public uint? CustomParam;
+
+	public ushort? DynFlags;
 }
